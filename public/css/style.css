@@ -1,0 +1,104 @@
+/* Shared stylesheet for every page in the app. Kept deliberately plain
+   (system fonts, no framework) so there's one simple file to read. */
+
+body {
+  font-family: -apple-system, system-ui, Segoe UI, Roboto, sans-serif;
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 1rem 1.25rem 3rem;
+  color: #1a1a1a;
+  line-height: 1.5;
+}
+
+nav {
+  font-size: 0.95rem;
+  margin-bottom: 1.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid #ddd;
+}
+
+nav a {
+  margin-right: 0.5rem;
+  text-decoration: none;
+  color: #1a5c2a;
+}
+
+nav a:hover {
+  text-decoration: underline;
+}
+
+h1 {
+  font-size: 1.6rem;
+  margin-bottom: 0.25rem;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1rem 0;
+}
+
+th, td {
+  text-align: left;
+  padding: 0.5rem 0.6rem;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+th {
+  background: #f4f6f4;
+}
+
+/* A single shared visual language for "this needs the right code
+   entered before it'll work" — used on admin controls and score-entry
+   forms alike. */
+.locked {
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+.unlock-bar {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  margin: 1rem 0;
+  padding: 0.75rem;
+  background: #f4f6f4;
+  border-radius: 6px;
+}
+
+.unlock-bar input {
+  padding: 0.4rem 0.5rem;
+  font-size: 1rem;
+}
+
+button {
+  padding: 0.45rem 0.9rem;
+  font-size: 0.95rem;
+  border: 1px solid #1a5c2a;
+  background: #1a5c2a;
+  color: white;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+button:hover {
+  background: #134420;
+}
+
+button.secondary {
+  background: white;
+  color: #1a5c2a;
+}
+
+.status-msg {
+  font-size: 0.9rem;
+  margin-left: 0.5rem;
+}
+
+.status-msg.error {
+  color: #b00020;
+}
+
+.status-msg.ok {
+  color: #1a5c2a;
+}
