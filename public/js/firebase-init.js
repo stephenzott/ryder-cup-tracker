@@ -7,12 +7,12 @@
 // normal for it to be visible in a public website's source code.
 // Firebase's real access control lives in firestore.rules, not here.
 const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_PROJECT_ID.firebasestorage.app",
-  messagingSenderId: "YOUR_SENDER_ID",
-  appId: "YOUR_APP_ID",
+  apiKey: "AIzaSyC0KrMbs0fJ75SJYMskeqv8ytB7Id382Xs",
+  authDomain: "golf-tracker-data.firebaseapp.com",
+  projectId: "golf-tracker-data",
+  storageBucket: "golf-tracker-data.firebasestorage.app",
+  messagingSenderId: "607235998741",
+  appId: "1:607235998741:web:d4a2ffc9f320e83d2b7a1c",
 };
 
 // We use Firebase's "modular" SDK, loaded straight from Google's CDN as
