@@ -1,12 +1,99 @@
 rules_version = '2';
 
-// Placeholder — denies everything until the real rules (anonymous-auth
-// unlock pattern) are written. See firestore.rules history / README
-// once that's in place.
+// How access control works in this app (no login screen, no passwords):
+//
+// 1. Every visitor is silently signed in anonymously (see auth.js). That
+//    gives each browser a stable `request.auth.uid` — not an identity,
+//    just a way for Firestore rules to recognize "this same device/tab
+//    asked before."
+// 2. The app asks once for a code ("score" code for entering results,
+//    or the stricter "admin" code for roster changes). That attempt is
+//    written to /unlocks/{uid} — a document only that uid can ever read.
+// 3. The real codes live in /secrets/config, a document NO ONE can read
+//    or write directly (allow read, write: if false below). Rules can
+//    still privately compare against it using get() — that's a trusted
+//    internal read, not a client read — so the actual code values never
+//    travel back to any browser.
+// 4. Every other collection checks /unlocks/{uid}'s `level` field to
+//    decide what a given browser is allowed to write.
+//
+// This is a light deterrent for a friends' trip, not bank-grade
+// security: Firestore doesn't rate-limit writes, so someone could
+// script repeated guesses at /unlocks. Good enough to stop idle
+// strangers and typos; not a defense against a motivated attacker.
+
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /{document=**} {
+
+    // Reads the current browser's unlock level ("score", "admin", or
+    // null if it never unlocked / unlocked wrong). Used everywhere else
+    // below to decide write access.
+    function level() {
+      return request.auth != null
+        && exists(/databases/$(database)/documents/unlocks/$(request.auth.uid))
+        ? get(/databases/$(database)/documents/unlocks/$(request.auth.uid)).data.level
+        : null;
+    }
+
+    function isAdmin() {
+      return level() == 'admin';
+    }
+
+    // The real secret codes. Never directly readable or writable by any
+    // client — only touched via get() inside this file, and only ever
+    // set/edited by hand in the Firebase console.
+    match /secrets/{doc} {
       allow read, write: if false;
+    }
+
+    // Each browser's own unlock attempt/result. A client can create or
+    // overwrite ONLY its own uid's doc, and only by supplying a code
+    // that matches the corresponding secret — checked server-side via
+    // get() above, so the real code is never sent back to the browser.
+    match /unlocks/{uid} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+
+      allow create, update: if request.auth != null
+        && request.auth.uid == uid
+        && request.resource.data.level in ['score', 'admin']
+        && (
+          (request.resource.data.level == 'score'
+            && request.resource.data.code == get(/databases/$(database)/documents/secrets/config).data.scoreCode)
+          ||
+          (request.resource.data.level == 'admin'
+            && request.resource.data.code == get(/databases/$(database)/documents/secrets/config).data.adminCode)
+        );
+
+      allow delete: if false;
+    }
+
+    // Roster. Visible to anyone (it's just names/handicaps/teams), but
+    // only the admin code can add, edit, or remove players.
+    match /players/{playerId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
+    }
+
+    // Round metadata (label/course/format/points available). Seeded
+    // once by hand in the console — nothing in the app UI edits these,
+    // so there's no write path for anyone.
+    match /rounds/{roundId} {
+      allow read: if true;
+      allow write: if false;
+
+      // Individual matches within a round. The score code can update
+      // hole-by-hole results, but can ONLY touch the `holes` field —
+      // it can't reassign which players are in the match. Setting up
+      // or deleting a match (the pairings) requires the admin code.
+      match /matches/{matchId} {
+        allow read: if true;
+
+        allow create, delete: if isAdmin();
+
+        allow update: if isAdmin()
+          || (level() == 'score'
+              && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['holes']));
+      }
     }
   }
 }
