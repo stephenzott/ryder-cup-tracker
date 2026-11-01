@@ -1,0 +1,16 @@
+# OS cruft
+.DS_Store
+
+# Old Jekyll/markdown version of the site — kept locally for reference,
+# not part of the new Firebase app's history.
+golf-trip-site/
+golf-trip-tracker.zip
+
+# Firebase CLI local state/logs
+.firebase/
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+
+# Node (in case any tooling gets added later)
+node_modules/
