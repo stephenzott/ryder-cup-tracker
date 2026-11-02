@@ -220,6 +220,16 @@ button.secondary {
   gap: 0.3rem;
 }
 
+/* Best ball's two labeled inputs per side (one per player) stay
+   visually grouped by side, with a little breathing room between the
+   USA group and the EUR group. */
+.hole-entry-side {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
 .hole-entry input[type="number"] {
   width: 3.5rem;
   text-align: center;

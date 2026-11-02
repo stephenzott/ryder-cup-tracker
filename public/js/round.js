@@ -174,10 +174,55 @@ function statusLabel(segment) {
   return `${leader} ${Math.abs(segment.margin)} UP`;
 }
 
-function holeInputValue(data, holeNum, side) {
+// playerIndex is only used for best ball (round.holeShape ===
+// "perPlayer"), where a side's value is an array of each player's own
+// strokes instead of one shared number.
+function holeInputValue(data, holeNum, side, playerIndex = null) {
   const hole = (data.holes || {})[String(holeNum)];
-  const v = hole ? hole[side] : null;
+  if (!hole) return "";
+  let v = hole[side];
+  if (playerIndex != null) v = Array.isArray(v) ? v[playerIndex] : null;
   return v == null ? "" : v;
+}
+
+// Builds the actual score inputs for the current hole. Rounds 1/2/4
+// share one combined number per side ("USA"/"EUR"); round 3 (best
+// ball) needs one input per player, labeled with their actual name,
+// since each player plays their own ball.
+function renderHoleInputs(matchId, data, currentHole, sideA, sideB) {
+  if (round.holeShape !== "perPlayer") {
+    const aVal = holeInputValue(data, currentHole, "a");
+    const bVal = holeInputValue(data, currentHole, "b");
+    return `
+      <label>USA
+        <input type="number" min="1" max="15" inputmode="numeric" class="hole-score-input"
+               data-match-id="${matchId}" data-side="a" value="${aVal}" ${isScoreUnlocked ? "" : "disabled"} />
+      </label>
+      <label>EUR
+        <input type="number" min="1" max="15" inputmode="numeric" class="hole-score-input"
+               data-match-id="${matchId}" data-side="b" value="${bVal}" ${isScoreUnlocked ? "" : "disabled"} />
+      </label>
+    `;
+  }
+
+  const sideInputs = (side, ids) =>
+    ids
+      .map((pid, i) => {
+        const val = holeInputValue(data, currentHole, side, i);
+        return `
+          <label>${playerName(pid)}
+            <input type="number" min="1" max="15" inputmode="numeric" class="hole-score-input"
+                   data-match-id="${matchId}" data-side="${side}" data-player-index="${i}"
+                   value="${val}" ${isScoreUnlocked ? "" : "disabled"} />
+          </label>
+        `;
+      })
+      .join("");
+
+  return `
+    <span class="hole-entry-side">USA: ${sideInputs("a", sideA)}</span>
+    <span class="hole-entry-side">EUR: ${sideInputs("b", sideB)}</span>
+  `;
 }
 
 // Same box-coloring convention as the scoreboard page (blue/red/grey/
@@ -233,8 +278,6 @@ function renderMatchCard(matchId) {
 
   const currentHole = currentHoleFor(matchId, holes);
   const holeInfo = course.holes[currentHole - 1];
-  const aVal = holeInputValue(data, currentHole, "a");
-  const bVal = holeInputValue(data, currentHole, "b");
 
   let navNumbers = "";
   let navBoxes = "";
@@ -267,16 +310,7 @@ function renderMatchCard(matchId) {
         <strong>Hole ${currentHole}</strong> — Par ${holeInfo.par}, Stroke Index ${holeInfo.strokeIndex}
         <button type="button" class="secondary next-hole" data-match-id="${matchId}" ${currentHole >= 18 ? "disabled" : ""}>Next ▶</button>
         <div>
-          <label>USA
-            <input type="number" min="1" max="15" inputmode="numeric" class="hole-score-input"
-                   data-match-id="${matchId}" data-hole="${currentHole}" data-side="a"
-                   value="${aVal}" ${isScoreUnlocked ? "" : "disabled"} />
-          </label>
-          <label>EUR
-            <input type="number" min="1" max="15" inputmode="numeric" class="hole-score-input"
-                   data-match-id="${matchId}" data-hole="${currentHole}" data-side="b"
-                   value="${bVal}" ${isScoreUnlocked ? "" : "disabled"} />
-          </label>
+          ${renderHoleInputs(matchId, data, currentHole, sideA, sideB)}
           <button type="button" class="save-hole" data-match-id="${matchId}" ${isScoreUnlocked ? "" : "disabled"}>Save</button>
           <span class="status-msg" data-save-status="${matchId}-hole"></span>
         </div>
@@ -324,15 +358,30 @@ function renderMatches() {
     });
   });
 
+  // Reads a side's inputs for the hole currently open on a match card.
+  // Best ball (holeShape "perPlayer") has one input per player and
+  // needs them back as an array in player order; everything else has
+  // just the one shared input.
+  function readSideValue(card, side) {
+    const inputs = [...card.querySelectorAll(`.hole-score-input[data-side="${side}"]`)];
+    const parsed = (input) => (input.value === "" ? null : parseInt(input.value, 10));
+    if (round.holeShape !== "perPlayer") return parsed(inputs[0]);
+    return inputs
+      .sort((x, y) => x.dataset.playerIndex - y.dataset.playerIndex)
+      .map(parsed);
+  }
+
+  function sideComplete(value) {
+    return round.holeShape === "perPlayer" ? value.every((v) => v != null) : value != null;
+  }
+
   document.querySelectorAll(".save-hole").forEach((btn) => {
     btn.addEventListener("click", async () => {
       const matchId = btn.dataset.matchId;
       const card = btn.closest(".match-card");
       const hole = currentHoleByMatch[matchId];
-      const aInput = card.querySelector('.hole-score-input[data-side="a"]');
-      const bInput = card.querySelector('.hole-score-input[data-side="b"]');
-      const aValue = aInput.value === "" ? null : parseInt(aInput.value, 10);
-      const bValue = bInput.value === "" ? null : parseInt(bInput.value, 10);
+      const aValue = readSideValue(card, "a");
+      const bValue = readSideValue(card, "b");
 
       await updateDoc(matchRef(matchId), {
         [`holes.${hole}.a`]: aValue,
@@ -342,7 +391,7 @@ function renderMatches() {
       // Once both scores for this hole are in, move on to the next
       // one automatically -- matches walking down the fairway hole by
       // hole rather than making you click "Next" every time.
-      if (aValue != null && bValue != null && hole < 18) {
+      if (sideComplete(aValue) && sideComplete(bValue) && hole < 18) {
         currentHoleByMatch[matchId] = hole + 1;
       }
       renderMatches();

@@ -11,13 +11,23 @@
 //
 // For best ball (round 3), a side's value is an ARRAY of each player's
 // strokes instead of a single number — e.g. a: [4, 5] — and the side's
-// effective score for that hole is whichever player did better.
+// effective score for that hole is whichever player did better. The
+// hole only counts as decided once every player in the array has a
+// score in; a: [4, null] reads as "not entered yet," same as a: null.
 
 // Reduces a hole's value for one side down to a single stroke count,
 // whether it was recorded as one shared number (scramble/greensomes/
 // singles) or as multiple players' individual scores (best ball).
+// For best ball, the side doesn't have a score for the hole at all
+// until EVERY player on it has entered one -- a half-filled pair
+// (e.g. [4, null]) isn't "4," it's "not yet," so this returns null
+// rather than letting null coerce to 0 in a Math.min.
 function sideStrokes(value) {
-  return Array.isArray(value) ? Math.min(...value) : value;
+  if (Array.isArray(value)) {
+    if (value.length === 0 || value.some((v) => v == null)) return null;
+    return Math.min(...value);
+  }
+  return value;
 }
 
 // Who won a single hole: 'a', 'b', 'halved', or null if it hasn't
@@ -25,35 +35,29 @@ function sideStrokes(value) {
 // page wants this directly (to color a box per hole) without caring
 // about margins or points at all.
 export function holeWinner(hole) {
-  if (!hole || hole.a == null || hole.b == null) return null;
+  if (!hole) return null;
   const a = sideStrokes(hole.a);
   const b = sideStrokes(hole.b);
+  if (a == null || b == null) return null;
   if (a < b) return "a";
   if (b < a) return "b";
   return "halved";
 }
 
-// Match-play "net" for a single hole, from Team A's perspective:
-// +1 if A won the hole, -1 if B won it, 0 if halved (or not played).
-function holeNet(hole) {
-  const winner = holeWinner(hole);
-  if (winner === "a") return 1;
-  if (winner === "b") return -1;
-  return 0;
-}
-
 // Sums the match-play net across a range of holes (inclusive), only
-// counting holes that have actually been entered for BOTH sides.
-// Returns both the running margin and how many of the range's holes
-// are in yet, so callers can tell "A is 2up" apart from "A is 2up, but
-// only 3 holes have been played so this isn't final."
+// counting holes that have actually been decided for BOTH sides (via
+// holeWinner, so a half-entered best-ball pair correctly doesn't count
+// yet). Returns both the running margin and how many of the range's
+// holes are in, so callers can tell "A is 2up" apart from "A is 2up,
+// but only 3 holes have been played so this isn't final."
 function marginForRange(holes, startHole, endHole) {
   let margin = 0;
   let holesEntered = 0;
   for (let h = startHole; h <= endHole; h++) {
-    const hole = holes[String(h)];
-    if (!hole || hole.a == null || hole.b == null) continue;
-    margin += holeNet(hole);
+    const winner = holeWinner(holes[String(h)]);
+    if (winner == null) continue;
+    if (winner === "a") margin += 1;
+    else if (winner === "b") margin -= 1;
     holesEntered++;
   }
   const holesTotal = endHole - startHole + 1;
