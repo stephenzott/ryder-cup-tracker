@@ -44,20 +44,23 @@ function statusLabel(segment) {
 
 // A hole that hasn't been entered for both sides yet is shown as an
 // empty box rather than implying anything about who's "ahead" there.
-function holeBoxClass(hole) {
-  const winner = holeWinner(hole);
+// `data` carries sideA/sideB/strokesGiven so this reflects NET results
+// once strokes given are in play, not just gross strokes.
+function holeBoxClass(hole, holeNum, data) {
+  const winner = holeWinner(hole, holeNum, data);
   if (winner === "a") return "hole-usa";
   if (winner === "b") return "hole-eur";
   if (winner === "halved") return "hole-halved";
   return "hole-empty";
 }
 
-function holeStrip(holes) {
+function holeStrip(data) {
+  const holes = data.holes || {};
   let numbers = "";
   let boxes = "";
   for (let h = 1; h <= 18; h++) {
     numbers += `<div class="hole-num">${h}</div>`;
-    boxes += `<div class="hole-box ${holeBoxClass(holes[String(h)])}"></div>`;
+    boxes += `<div class="hole-box ${holeBoxClass(holes[String(h)], h, data)}"></div>`;
     if (h === 9) {
       numbers += `<div class="hole-gap"></div>`;
       boxes += `<div class="hole-gap"></div>`;
@@ -72,7 +75,7 @@ function holeStrip(holes) {
 function renderMatchRow(matchId, data) {
   const aNames = (data.sideA || []).map(playerName).join(" & ") || "TBD";
   const bNames = (data.sideB || []).map(playerName).join(" & ") || "TBD";
-  const scored = scoreMatch(data.holes || {});
+  const scored = scoreMatch(data);
 
   return `
     <div class="match-card">
@@ -83,7 +86,7 @@ function renderMatchRow(matchId, data) {
         Overall: <strong>${statusLabel(scored.overall)}</strong><br>
         Points — USA ${scored.points.a}, EUR ${scored.points.b}
       </p>
-      ${holeStrip(data.holes || {})}
+      ${holeStrip(data)}
     </div>
   `;
 }

@@ -104,6 +104,66 @@ function playerSelect(name, selectedId, team) {
   return `<select name="${name}"><option value="">—</option>${options}</select>`;
 }
 
+// The N holes a player would get strokes on under a straightforward
+// "hardest holes first" allocation -- just a starting point for the
+// toggle strip below, which admin can freely override. Wraps past 18
+// for counts above 18 (2nd stroke on the hardest holes), matching how
+// full handicap allocation works for a high handicap.
+function hardestHoles(count) {
+  const sorted = [...course.holes].sort((a, b) => a.strokeIndex - b.strokeIndex);
+  return Array.from({ length: count }, (_, i) => sorted[i % 18].hole);
+}
+
+// One clickable box per hole, cycling 0 -> 1 -> 2 -> 0 strokes on
+// click (see the click handler in renderAdminSetup). Same sizing as
+// the scoreboard's hole-box grid, different meaning: here it's "does
+// this player get a stroke here," not "who won this hole."
+function strokesToggleStrip(playerId, currentHoles) {
+  let html = "";
+  for (let h = 1; h <= 18; h++) {
+    const count = currentHoles.filter((x) => x === h).length;
+    html += `<button type="button" class="hole-toggle-btn${count > 0 ? " toggled" : ""}"
+               data-player-id="${playerId}" data-hole="${h}" data-stroke-count="${count}"
+               aria-label="Hole ${h}">${count > 1 ? count : ""}</button>`;
+    if (h === 9) html += `<div class="hole-gap"></div>`;
+  }
+  return html;
+}
+
+// Strokes-given setup for one match -- only for rounds where it's
+// eligible (3 and 4), and only once pairings are actually set (no
+// point picking strokes for players that aren't assigned yet).
+function renderStrokesGivenRow(matchId, data) {
+  if (!round.strokesGivenEligible) return "";
+  const sideA = data.sideA || [];
+  const sideB = data.sideB || [];
+  if (sideA.length === 0 || sideB.length === 0) return "";
+
+  const playerRows = [...sideA, ...sideB]
+    .map((pid) => {
+      const current = (data.strokesGiven && data.strokesGiven[pid]) || [];
+      return `
+        <div class="strokes-player">
+          <strong>${playerName(pid)}</strong>
+          <input type="number" min="0" max="36" class="strokes-count-input" data-player-id="${pid}" value="${current.length}" />
+          <button type="button" class="secondary apply-strokes" data-player-id="${pid}">Apply to hardest holes</button>
+          <div class="hole-strip strokes-toggle-strip" data-player-id="${pid}">${strokesToggleStrip(pid, current)}</div>
+        </div>
+      `;
+    })
+    .join("");
+
+  return `
+    <div class="strokes-given-row" data-strokes-match-id="${matchId}">
+      <h4>${matchId.replace("match", "Match ")} — Strokes Given</h4>
+      <p class="status-msg">Click a hole to toggle a stroke for that player (click again for a 2nd). "Apply" is just a starting point -- adjust freely.</p>
+      ${playerRows}
+      <button type="button" class="save-strokes" data-match-id="${matchId}">Save Strokes Given</button>
+      <span class="status-msg" data-save-status="${matchId}-strokes"></span>
+    </div>
+  `;
+}
+
 function renderAdminSetup() {
   const section = document.getElementById("admin-setup");
   section.style.display = isAdminUnlocked ? "" : "none";
@@ -136,6 +196,7 @@ function renderAdminSetup() {
           <button type="button" class="save-pairing" data-match-id="${matchId}">Save</button>
           <span class="status-msg" data-save-status="${matchId}"></span>
         </div>
+        ${renderStrokesGivenRow(matchId, data)}
       `;
     })
     .join("");
@@ -154,6 +215,63 @@ function renderAdminSetup() {
       // `holes` data already saved for this match is left alone.
       await setDoc(matchRef(matchId), { sideA, sideB }, { merge: true });
       const status = row.querySelector(`[data-save-status="${matchId}"]`);
+      status.textContent = "Saved.";
+      status.className = "status-msg ok";
+    });
+  });
+
+  // Click a hole box to cycle that player's stroke count on it --
+  // pure local DOM state until "Save Strokes Given" is clicked, so
+  // clicking around doesn't write to Firestore on every tap.
+  document.querySelectorAll(".hole-toggle-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const next = (parseInt(btn.dataset.strokeCount, 10) + 1) % 3;
+      btn.dataset.strokeCount = next;
+      btn.textContent = next > 1 ? String(next) : "";
+      btn.classList.toggle("toggled", next > 0);
+    });
+  });
+
+  // "Apply to hardest holes": fills the strip from the number input,
+  // overwriting whatever's currently toggled for that player. Doesn't
+  // touch other players or save anything by itself.
+  document.querySelectorAll(".apply-strokes").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const playerId = btn.dataset.playerId;
+      const count = parseInt(
+        document.querySelector(`.strokes-count-input[data-player-id="${playerId}"]`).value || "0",
+        10
+      );
+      const holes = hardestHoles(count);
+      document
+        .querySelectorAll(`.strokes-toggle-strip[data-player-id="${playerId}"] .hole-toggle-btn`)
+        .forEach((holeBtn) => {
+          const h = parseInt(holeBtn.dataset.hole, 10);
+          const strokeCount = holes.filter((x) => x === h).length;
+          holeBtn.dataset.strokeCount = strokeCount;
+          holeBtn.textContent = strokeCount > 1 ? String(strokeCount) : "";
+          holeBtn.classList.toggle("toggled", strokeCount > 0);
+        });
+    });
+  });
+
+  document.querySelectorAll(".save-strokes").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const matchId = btn.dataset.matchId;
+      const row = document.querySelector(`[data-strokes-match-id="${matchId}"]`);
+      const strokesGiven = {};
+      row.querySelectorAll(".strokes-player").forEach((playerBlock) => {
+        const strip = playerBlock.querySelector(".strokes-toggle-strip");
+        const playerId = strip.dataset.playerId;
+        const holes = [];
+        strip.querySelectorAll(".hole-toggle-btn").forEach((holeBtn) => {
+          const count = parseInt(holeBtn.dataset.strokeCount, 10);
+          for (let i = 0; i < count; i++) holes.push(parseInt(holeBtn.dataset.hole, 10));
+        });
+        strokesGiven[playerId] = holes;
+      });
+      await setDoc(matchRef(matchId), { strokesGiven }, { merge: true });
+      const status = row.querySelector(`[data-save-status="${matchId}-strokes"]`);
       status.textContent = "Saved.";
       status.className = "status-msg ok";
     });
@@ -185,6 +303,20 @@ function holeInputValue(data, holeNum, side, playerIndex = null) {
   return v == null ? "" : v;
 }
 
+// How many strokes a player is given on a specific hole, so the entry
+// panel can show "(+1)" next to their name -- scorers enter what was
+// actually shot; the app applies the stroke when scoring, not here.
+function strokesOnHoleFor(data, playerId, holeNum) {
+  const given = data.strokesGiven && data.strokesGiven[playerId];
+  if (!given) return 0;
+  return given.filter((h) => h === holeNum).length;
+}
+
+function strokeBadge(count) {
+  if (count === 0) return "";
+  return ` <span class="status-msg">(+${count})</span>`;
+}
+
 // Builds the actual score inputs for the current hole. Rounds 1/2/4
 // share one combined number per side ("USA"/"EUR"); round 3 (best
 // ball) needs one input per player, labeled with their actual name,
@@ -193,12 +325,16 @@ function renderHoleInputs(matchId, data, currentHole, sideA, sideB) {
   if (round.holeShape !== "perPlayer") {
     const aVal = holeInputValue(data, currentHole, "a");
     const bVal = holeInputValue(data, currentHole, "b");
+    // Singles can still have strokes given (round 4) -- sideA[0]/sideB[0]
+    // are the two players.
+    const aBadge = strokeBadge(strokesOnHoleFor(data, sideA[0], currentHole));
+    const bBadge = strokeBadge(strokesOnHoleFor(data, sideB[0], currentHole));
     return `
-      <label>USA
+      <label>USA${aBadge}
         <input type="number" min="1" max="15" inputmode="numeric" class="hole-score-input"
                data-match-id="${matchId}" data-side="a" value="${aVal}" ${isScoreUnlocked ? "" : "disabled"} />
       </label>
-      <label>EUR
+      <label>EUR${bBadge}
         <input type="number" min="1" max="15" inputmode="numeric" class="hole-score-input"
                data-match-id="${matchId}" data-side="b" value="${bVal}" ${isScoreUnlocked ? "" : "disabled"} />
       </label>
@@ -209,8 +345,9 @@ function renderHoleInputs(matchId, data, currentHole, sideA, sideB) {
     ids
       .map((pid, i) => {
         const val = holeInputValue(data, currentHole, side, i);
+        const badge = strokeBadge(strokesOnHoleFor(data, pid, currentHole));
         return `
-          <label>${playerName(pid)}
+          <label>${playerName(pid)}${badge}
             <input type="number" min="1" max="15" inputmode="numeric" class="hole-score-input"
                    data-match-id="${matchId}" data-side="${side}" data-player-index="${i}"
                    value="${val}" ${isScoreUnlocked ? "" : "disabled"} />
@@ -228,8 +365,10 @@ function renderHoleInputs(matchId, data, currentHole, sideA, sideB) {
 // Same box-coloring convention as the scoreboard page (blue/red/grey/
 // empty) -- reusing it here means the hole navigator doubles as a
 // mini momentum view for just this match, not just a hole picker.
-function holeBoxClass(hole) {
-  const winner = holeWinner(hole);
+// `data` carries sideA/sideB/strokesGiven so this reflects NET results
+// once strokes given are in play, not just gross strokes.
+function holeBoxClass(hole, holeNum, data) {
+  const winner = holeWinner(hole, holeNum, data);
   if (winner === "a") return "hole-usa";
   if (winner === "b") return "hole-eur";
   if (winner === "halved") return "hole-halved";
@@ -241,9 +380,10 @@ function holeBoxClass(hole) {
 // match is fully entered. Only computed once per match (see the
 // currentHoleByMatch cache) so it doesn't jump around on every
 // re-render while someone's actively using it.
-function currentHoleFor(matchId, holes) {
+function currentHoleFor(matchId, data) {
   if (currentHoleByMatch[matchId] == null) {
-    const firstOpen = course.holes.find((h) => holeWinner(holes[String(h.hole)]) == null);
+    const holes = data.holes || {};
+    const firstOpen = course.holes.find((h) => holeWinner(holes[String(h.hole)], h.hole, data) == null);
     currentHoleByMatch[matchId] = firstOpen ? firstOpen.hole : 18;
   }
   return currentHoleByMatch[matchId];
@@ -266,7 +406,7 @@ function renderMatchCard(matchId) {
   const aNames = sideA.map(playerName).join(" & ") || "TBD";
   const bNames = sideB.map(playerName).join(" & ") || "TBD";
   const holes = data.holes || {};
-  const scored = scoreMatch(holes);
+  const scored = scoreMatch(data);
 
   // Projected points only mean anything once at least one hole is in
   // -- before that every segment reads as a meaningless 0.5/0.5 halve.
@@ -276,7 +416,7 @@ function renderMatchCard(matchId) {
       ? ` <span class="status-msg">(projected if it held: USA ${scored.projected.a}, EUR ${scored.projected.b})</span>`
       : "";
 
-  const currentHole = currentHoleFor(matchId, holes);
+  const currentHole = currentHoleFor(matchId, data);
   const holeInfo = course.holes[currentHole - 1];
 
   let navNumbers = "";
@@ -284,7 +424,7 @@ function renderMatchCard(matchId) {
   for (let h = 1; h <= 18; h++) {
     const selected = h === currentHole ? " selected" : "";
     navNumbers += `<div class="hole-num">${h}</div>`;
-    navBoxes += `<button type="button" class="hole-nav-btn ${holeBoxClass(holes[String(h)])}${selected}"
+    navBoxes += `<button type="button" class="hole-nav-btn ${holeBoxClass(holes[String(h)], h, data)}${selected}"
                    data-match-id="${matchId}" data-goto-hole="${h}" aria-label="Hole ${h}"></button>`;
     if (h === 9) {
       navNumbers += `<div class="hole-gap"></div>`;

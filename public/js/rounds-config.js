@@ -13,6 +13,10 @@
 //               one ball; singles: there's only one player anyway)
 //   "perPlayer" an array of each player's own strokes (best ball: each
 //               player plays their own ball, side score = the better one)
+//
+// strokesGivenEligible: whether admin can set per-player handicap
+// strokes for this round (best ball and singles -- gross-only for
+// scramble/greensomes per the trip's rules).
 export const ROUNDS = [
   {
     id: "round1",
@@ -23,6 +27,7 @@ export const ROUNDS = [
     matchCount: 4,
     playersPerSide: 2,
     holeShape: "single",
+    strokesGivenEligible: false,
   },
   {
     id: "round2",
@@ -33,6 +38,7 @@ export const ROUNDS = [
     matchCount: 4,
     playersPerSide: 2,
     holeShape: "single",
+    strokesGivenEligible: false,
   },
   {
     id: "round3",
@@ -43,6 +49,7 @@ export const ROUNDS = [
     matchCount: 4,
     playersPerSide: 2,
     holeShape: "perPlayer",
+    strokesGivenEligible: true,
   },
   {
     id: "round4",
@@ -53,6 +60,7 @@ export const ROUNDS = [
     matchCount: 8,
     playersPerSide: 1,
     holeShape: "single",
+    strokesGivenEligible: true,
   },
 ];
 

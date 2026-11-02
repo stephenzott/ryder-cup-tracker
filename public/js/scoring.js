@@ -7,37 +7,64 @@
 //   { "1": { a: 4, b: 5 }, "2": { a: 4, b: 4 }, ... }
 // — one entry per hole that's been played so far (missing holes just
 // aren't in the object yet), keyed by hole number as a string because
-// that's how Firestore stores map keys.
+// that's how Firestore stores map keys. These are always GROSS strokes
+// -- whatever the player actually took. Net scoring (strokes given)
+// is applied here, not at entry time, so the raw data always matches
+// what was actually shot.
 //
 // For best ball (round 3), a side's value is an ARRAY of each player's
 // strokes instead of a single number — e.g. a: [4, 5] — and the side's
-// effective score for that hole is whichever player did better. The
-// hole only counts as decided once every player in the array has a
-// score in; a: [4, null] reads as "not entered yet," same as a: null.
+// effective score for that hole is whichever player did better (after
+// strokes given, if any). The hole only counts as decided once every
+// player in the array has a score in; a: [4, null] reads as "not
+// entered yet," same as a: null.
+//
+// A match document can also carry:
+//   sideA / sideB: arrays of player IDs, in the same order as the
+//     per-player arrays in `holes` (so sideA[i]'s strokes are at
+//     hole.a[i]).
+//   strokesGiven: { [playerId]: [holeNumber, holeNumber, ...] } --
+//     which holes that player gets a stroke on. A hole number can
+//     appear twice for a 2-stroke hole. Only meaningful for rounds 3
+//     (best ball) and 4 (singles) -- rounds 1-2 never set this field,
+//     so they're unaffected without any special-casing here.
 
-// Reduces a hole's value for one side down to a single stroke count,
-// whether it was recorded as one shared number (scramble/greensomes/
-// singles) or as multiple players' individual scores (best ball).
-// For best ball, the side doesn't have a score for the hole at all
-// until EVERY player on it has entered one -- a half-filled pair
-// (e.g. [4, null]) isn't "4," it's "not yet," so this returns null
-// rather than letting null coerce to 0 in a Math.min.
-function sideStrokes(value) {
-  if (Array.isArray(value)) {
-    if (value.length === 0 || value.some((v) => v == null)) return null;
-    return Math.min(...value);
-  }
-  return value;
+// How many strokes a specific player is given on a specific hole (0 if
+// they have none, or if there's no strokes-given data at all).
+function strokesOnHole(playerId, holeNum, strokesGiven) {
+  if (!strokesGiven || !playerId || !strokesGiven[playerId]) return 0;
+  return strokesGiven[playerId].filter((h) => h === holeNum).length;
 }
 
-// Who won a single hole: 'a', 'b', 'halved', or null if it hasn't
-// been entered for both sides yet. Exported because the scoreboard
-// page wants this directly (to color a box per hole) without caring
-// about margins or points at all.
-export function holeWinner(hole) {
+// Reduces a hole's value for one side down to a single NET stroke
+// count, whether it was recorded as one shared number (scramble/
+// greensomes/singles) or as multiple players' individual scores (best
+// ball) -- subtracting any strokes given to each player on this hole
+// before comparing. For best ball, the side doesn't have a score for
+// the hole at all until EVERY player on it has entered one -- a
+// half-filled pair (e.g. [4, null]) isn't "4," it's "not yet," so this
+// returns null rather than letting null coerce to 0 in a Math.min.
+function sideStrokes(value, playerIds, holeNum, strokesGiven) {
+  if (Array.isArray(value)) {
+    if (value.length === 0 || value.some((v) => v == null)) return null;
+    const net = value.map((gross, i) => gross - strokesOnHole(playerIds?.[i], holeNum, strokesGiven));
+    return Math.min(...net);
+  }
+  if (value == null) return null;
+  return value - strokesOnHole(playerIds?.[0], holeNum, strokesGiven);
+}
+
+// Who won a single hole: 'a', 'b', 'halved', or null if it hasn't been
+// decided yet. `holeNum` and `match` (for its sideA/sideB/strokesGiven)
+// are only needed when strokes given are in play -- omit them and this
+// just compares gross strokes, which is all rounds 1-2 ever need.
+// Exported because the scoreboard and round pages want this directly
+// (to color a box per hole) without caring about margins or points.
+export function holeWinner(hole, holeNum, match = {}) {
   if (!hole) return null;
-  const a = sideStrokes(hole.a);
-  const b = sideStrokes(hole.b);
+  const { sideA, sideB, strokesGiven } = match;
+  const a = sideStrokes(hole.a, sideA, holeNum, strokesGiven);
+  const b = sideStrokes(hole.b, sideB, holeNum, strokesGiven);
   if (a == null || b == null) return null;
   if (a < b) return "a";
   if (b < a) return "b";
@@ -50,11 +77,11 @@ export function holeWinner(hole) {
 // yet). Returns both the running margin and how many of the range's
 // holes are in, so callers can tell "A is 2up" apart from "A is 2up,
 // but only 3 holes have been played so this isn't final."
-function marginForRange(holes, startHole, endHole) {
+function marginForRange(holes, startHole, endHole, match) {
   let margin = 0;
   let holesEntered = 0;
   for (let h = startHole; h <= endHole; h++) {
-    const winner = holeWinner(holes[String(h)]);
+    const winner = holeWinner(holes[String(h)], h, match);
     if (winner == null) continue;
     if (winner === "a") margin += 1;
     else if (winner === "b") margin -= 1;
@@ -92,12 +119,14 @@ function marginToPoints(margin) {
   return { a: 0.5, b: 0.5 };
 }
 
-// The main export. Given a match's `holes` map, returns the front 9,
-// back 9, and overall margins/status, plus the Nassau points each side
-// has actually earned so far (0 for any segment still in progress).
-export function scoreMatch(holes) {
-  const front = marginForRange(holes, 1, 9);
-  const back = marginForRange(holes, 10, 18);
+// The main export. Given a match document (holes, plus sideA/sideB/
+// strokesGiven if relevant), returns the front 9, back 9, and overall
+// margins/status, plus the Nassau points each side has actually earned
+// so far (0 for any segment still in progress).
+export function scoreMatch(match) {
+  const holes = match.holes || {};
+  const front = marginForRange(holes, 1, 9, match);
+  const back = marginForRange(holes, 10, 18, match);
   // "Overall" (the 18-hole bet) is just the two 9-hole margins
   // combined — matches how Nassau is actually settled, not a separate
   // stroke comparison.
@@ -138,15 +167,14 @@ export function scoreMatch(holes) {
 }
 
 // Convenience for anything that needs a round (or the whole trip's)
-// point total: pass an array of match data objects (each just needs a
-// `holes` field, e.g. straight off a Firestore snapshot) and get back
-// the summed real AND projected points. Used by both the standings
-// page (across all of a round's matches) and each round page (same
-// thing, scoped to just that round).
+// point total: pass an array of match data objects straight off a
+// Firestore snapshot and get back the summed real AND projected
+// points. Used by both the standings page (across all of a round's
+// matches) and each round page (same thing, scoped to just that round).
 export function sumMatchPoints(matches) {
   const totals = { a: 0, b: 0, projectedA: 0, projectedB: 0 };
   for (const match of matches) {
-    const scored = scoreMatch(match.holes || {});
+    const scored = scoreMatch(match);
     totals.a += scored.points.a;
     totals.b += scored.points.b;
     totals.projectedA += scored.projected.a;
