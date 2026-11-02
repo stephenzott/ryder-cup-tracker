@@ -125,13 +125,19 @@ function hardestHoles(count, avoidHoles = []) {
 
 // Read-only strip showing where a player's strokes currently land --
 // view only, not clickable, since strokes are always set via the shot
-// count + "Apply," never picked hole-by-hole.
+// count + "Apply," never picked hole-by-hole. Each box always shows
+// that hole's stroke index, so you can see the difficulty ranking (and
+// which holes a given count would hit) before even entering a number
+// -- a "*" after the index flags a 2nd stroke there (only possible for
+// shot counts above 18).
 function strokesDisplayStrip(playerId, currentHoles) {
   let html = "";
   for (let h = 1; h <= 18; h++) {
     const count = currentHoles.filter((x) => x === h).length;
+    const strokeIndex = course.holes[h - 1].strokeIndex;
+    const label = count > 1 ? `${strokeIndex}*` : String(strokeIndex);
     html += `<div class="hole-toggle-btn${count > 0 ? " toggled" : ""}"
-               data-player-id="${playerId}" data-hole="${h}" data-stroke-count="${count}">${count > 1 ? count : ""}</div>`;
+               data-player-id="${playerId}" data-hole="${h}" data-stroke-count="${count}">${label}</div>`;
     if (h === 9) html += `<div class="hole-gap"></div>`;
   }
   return html;
@@ -246,8 +252,9 @@ function renderAdminSetup() {
         .forEach((holeBox) => {
           const h = parseInt(holeBox.dataset.hole, 10);
           const strokeCount = holes.filter((x) => x === h).length;
+          const strokeIndex = course.holes[h - 1].strokeIndex;
           holeBox.dataset.strokeCount = strokeCount;
-          holeBox.textContent = strokeCount > 1 ? String(strokeCount) : "";
+          holeBox.textContent = strokeCount > 1 ? `${strokeIndex}*` : String(strokeIndex);
           holeBox.classList.toggle("toggled", strokeCount > 0);
         });
     });

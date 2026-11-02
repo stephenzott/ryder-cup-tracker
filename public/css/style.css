@@ -293,13 +293,14 @@ button.secondary {
   align-items: center;
   justify-content: center;
   background: #eee;
-  font-size: 0.7rem;
-  color: white;
+  font-size: 0.65rem;
+  color: #555;
 }
 
 .hole-toggle-btn.toggled {
   background: #1a5c2a;
   border-color: #1a5c2a;
+  color: white;
 }
 
 .hole-entry input[type="number"] {
