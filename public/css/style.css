@@ -18,7 +18,9 @@ nav {
 }
 
 nav a {
+  display: inline-block;
   margin-right: 0.5rem;
+  padding: 0.3rem 0;
   text-decoration: none;
   color: #1a5c2a;
 }
@@ -32,8 +34,20 @@ h1 {
   margin-bottom: 0.25rem;
 }
 
+/* Tables with many columns (the schedule page especially) are wider
+   than a phone screen no matter how much cell text wraps. Rather than
+   let them get silently clipped at the edge, turn each table into its
+   own horizontally-scrollable strip: `display: block` takes the table
+   out of normal table-sizing rules so overflow-x can apply to it
+   directly, while its row/cell children keep their default table
+   display values, so columns still line up correctly within the
+   scrollable strip. */
 table {
+  display: block;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
   width: 100%;
+  max-width: 100%;
   border-collapse: collapse;
   margin: 1rem 0;
 }
@@ -66,13 +80,37 @@ th {
   border-radius: 6px;
 }
 
+/* Applies to every form on the site (currently just "Add player," but
+   any future form gets this for free): lets the fields wrap onto
+   their own lines on a narrow screen instead of squeezing together,
+   with comfortable spacing either way. */
+form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+input, select {
+  padding: 0.5rem;
+  /* 16px is the magic number below which iOS Safari zooms the whole
+     page in when you tap into a field — a standard mobile-web gotcha,
+     not a design choice. 1rem = 16px here avoids it. */
+  font-size: 1rem;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+
 .unlock-bar input {
   padding: 0.4rem 0.5rem;
   font-size: 1rem;
 }
 
 button {
-  padding: 0.45rem 0.9rem;
+  /* Padding sized so the tappable area comes out close to the ~44px
+     minimum touch-target size recommended for phones, not just
+     whatever the text needs. */
+  padding: 0.6rem 1rem;
   font-size: 0.95rem;
   border: 1px solid #1a5c2a;
   background: #1a5c2a;
