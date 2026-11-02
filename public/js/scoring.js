@@ -54,6 +54,17 @@ function sideStrokes(value, playerIds, holeNum, strokesGiven) {
   return value - strokesOnHole(playerIds?.[0], holeNum, strokesGiven);
 }
 
+// Whether side 'a' and/or side 'b' has a player getting a stroke on
+// this hole -- not a scoring result, just "does anyone here get a
+// shot," for a visual marker next to the hole (round page's nav strip,
+// scoreboard's momentum strip). Both can be true at once if strokes
+// happen to be set on both sides of the same hole.
+export function strokeSidesForHole(match, holeNum) {
+  const sideHasStroke = (playerIds) =>
+    (playerIds || []).some((pid) => strokesOnHole(pid, holeNum, match.strokesGiven) > 0);
+  return { a: sideHasStroke(match.sideA), b: sideHasStroke(match.sideB) };
+}
+
 // Who won a single hole: 'a', 'b', 'halved', or null if it hasn't been
 // decided yet. `holeNum` and `match` (for its sideA/sideB/strokesGiven)
 // are only needed when strokes given are in play -- omit them and this

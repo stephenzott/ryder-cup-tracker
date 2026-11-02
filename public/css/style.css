@@ -156,6 +156,7 @@ button.secondary {
 }
 
 .hole-box {
+  position: relative;
   flex: 0 0 1.5rem;
   height: 1.5rem;
   border-radius: 3px;
@@ -187,6 +188,7 @@ button.secondary {
    plus button resets and a highlight for whichever hole is currently
    open in the entry panel below. */
 .hole-nav-btn {
+  position: relative;
   flex: 0 0 1.5rem;
   height: 1.5rem;
   border-radius: 3px;
@@ -197,6 +199,37 @@ button.secondary {
 
 .hole-nav-btn.selected {
   border-color: #1a1a1a;
+}
+
+/* Small marker in the corner of a hole box/button showing someone's
+   getting a handicap stroke there -- blue for a USA player, red for
+   Europe, independent of (and layered on top of) the box's own
+   win/loss/halve fill color. Works on both .hole-box (scoreboard's
+   plain divs) and .hole-nav-btn (round pages' clickable buttons)
+   since both are position:relative. */
+.stroke-dot-a::after,
+.stroke-dot-b::after,
+.stroke-dot-both::after {
+  content: "";
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  border: 1px solid white;
+}
+
+.stroke-dot-a::after {
+  background: #2962ff;
+}
+
+.stroke-dot-b::after {
+  background: #d32f2f;
+}
+
+.stroke-dot-both::after {
+  background: linear-gradient(90deg, #2962ff 50%, #d32f2f 50%);
 }
 
 .hole-entry {
@@ -249,13 +282,16 @@ button.secondary {
   text-align: center;
 }
 
+/* A read-only display, not a button -- strokes are always set via the
+   shot count + Apply (see round.js), never picked hole-by-hole. */
 .hole-toggle-btn {
   flex: 0 0 1.5rem;
   height: 1.5rem;
   border-radius: 3px;
   border: 1px solid #ccc;
-  padding: 0;
-  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   background: #eee;
   font-size: 0.7rem;
   color: white;

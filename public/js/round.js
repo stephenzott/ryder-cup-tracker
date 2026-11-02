@@ -23,7 +23,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/11.3.1/firebase-firestore.js";
 import { ROUNDS, pointsAvailable } from "./rounds-config.js";
 import { COURSES } from "./courses-config.js";
-import { scoreMatch, sumMatchPoints, holeWinner } from "./scoring.js";
+import { scoreMatch, sumMatchPoints, holeWinner, strokeSidesForHole } from "./scoring.js";
 
 const app = document.getElementById("app");
 const roundId = app.dataset.roundId;
@@ -104,27 +104,34 @@ function playerSelect(name, selectedId, team) {
   return `<select name="${name}"><option value="">—</option>${options}</select>`;
 }
 
-// The N holes a player would get strokes on under a straightforward
-// "hardest holes first" allocation -- just a starting point for the
-// toggle strip below, which admin can freely override. Wraps past 18
-// for counts above 18 (2nd stroke on the hardest holes), matching how
-// full handicap allocation works for a high handicap.
-function hardestHoles(count) {
-  const sorted = [...course.holes].sort((a, b) => a.strokeIndex - b.strokeIndex);
-  return Array.from({ length: count }, (_, i) => sorted[i % 18].hole);
+// The N holes a player gets strokes on: always the hardest-by-stroke-
+// index holes, in order -- that's how handicap allocation actually
+// works (never picked hole-by-hole), which is why there's no manual
+// per-hole override anywhere here. `avoidHoles` (closing holes 9/18,
+// typically) gets skipped over in favor of the next hardest hole --
+// some courses rate a closing hole as very low stroke index (e.g.
+// Straits' 18th is index 2), and you may not want the match decided
+// by a stroke on the last hole of a nine. Wraps past 18 candidates for
+// counts above that (2nd stroke on the hardest holes), matching full
+// handicap allocation for a high handicap. Works off course.holes'
+// par/strokeIndex data generically, so this applies the same way to
+// whatever courses get added in future years.
+function hardestHoles(count, avoidHoles = []) {
+  const sorted = [...course.holes]
+    .filter((h) => !avoidHoles.includes(h.hole))
+    .sort((a, b) => a.strokeIndex - b.strokeIndex);
+  return Array.from({ length: count }, (_, i) => sorted[i % sorted.length].hole);
 }
 
-// One clickable box per hole, cycling 0 -> 1 -> 2 -> 0 strokes on
-// click (see the click handler in renderAdminSetup). Same sizing as
-// the scoreboard's hole-box grid, different meaning: here it's "does
-// this player get a stroke here," not "who won this hole."
-function strokesToggleStrip(playerId, currentHoles) {
+// Read-only strip showing where a player's strokes currently land --
+// view only, not clickable, since strokes are always set via the shot
+// count + "Apply," never picked hole-by-hole.
+function strokesDisplayStrip(playerId, currentHoles) {
   let html = "";
   for (let h = 1; h <= 18; h++) {
     const count = currentHoles.filter((x) => x === h).length;
-    html += `<button type="button" class="hole-toggle-btn${count > 0 ? " toggled" : ""}"
-               data-player-id="${playerId}" data-hole="${h}" data-stroke-count="${count}"
-               aria-label="Hole ${h}">${count > 1 ? count : ""}</button>`;
+    html += `<div class="hole-toggle-btn${count > 0 ? " toggled" : ""}"
+               data-player-id="${playerId}" data-hole="${h}" data-stroke-count="${count}">${count > 1 ? count : ""}</div>`;
     if (h === 9) html += `<div class="hole-gap"></div>`;
   }
   return html;
@@ -146,8 +153,9 @@ function renderStrokesGivenRow(matchId, data) {
         <div class="strokes-player">
           <strong>${playerName(pid)}</strong>
           <input type="number" min="0" max="36" class="strokes-count-input" data-player-id="${pid}" value="${current.length}" />
+          <label><input type="checkbox" class="avoid-closing-checkbox" data-player-id="${pid}" /> Avoid 9 &amp; 18</label>
           <button type="button" class="secondary apply-strokes" data-player-id="${pid}">Apply to hardest holes</button>
-          <div class="hole-strip strokes-toggle-strip" data-player-id="${pid}">${strokesToggleStrip(pid, current)}</div>
+          <div class="hole-strip strokes-toggle-strip" data-player-id="${pid}">${strokesDisplayStrip(pid, current)}</div>
         </div>
       `;
     })
@@ -156,7 +164,7 @@ function renderStrokesGivenRow(matchId, data) {
   return `
     <div class="strokes-given-row" data-strokes-match-id="${matchId}">
       <h4>${matchId.replace("match", "Match ")} — Strokes Given</h4>
-      <p class="status-msg">Click a hole to toggle a stroke for that player (click again for a 2nd). "Apply" is just a starting point -- adjust freely.</p>
+      <p class="status-msg">Enter a shot count and click Apply -- strokes always go on the hardest holes in order, same as real handicap allocation.</p>
       ${playerRows}
       <button type="button" class="save-strokes" data-match-id="${matchId}">Save Strokes Given</button>
       <span class="status-msg" data-save-status="${matchId}-strokes"></span>
@@ -220,21 +228,10 @@ function renderAdminSetup() {
     });
   });
 
-  // Click a hole box to cycle that player's stroke count on it --
-  // pure local DOM state until "Save Strokes Given" is clicked, so
-  // clicking around doesn't write to Firestore on every tap.
-  document.querySelectorAll(".hole-toggle-btn").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      const next = (parseInt(btn.dataset.strokeCount, 10) + 1) % 3;
-      btn.dataset.strokeCount = next;
-      btn.textContent = next > 1 ? String(next) : "";
-      btn.classList.toggle("toggled", next > 0);
-    });
-  });
-
-  // "Apply to hardest holes": fills the strip from the number input,
-  // overwriting whatever's currently toggled for that player. Doesn't
-  // touch other players or save anything by itself.
+  // "Apply to hardest holes": fills the (read-only) strip from the
+  // number input and the "avoid 9 & 18" checkbox. The only way
+  // strokes ever get set -- nothing here is directly clickable.
+  // Doesn't touch other players or save anything by itself.
   document.querySelectorAll(".apply-strokes").forEach((btn) => {
     btn.addEventListener("click", () => {
       const playerId = btn.dataset.playerId;
@@ -242,15 +239,16 @@ function renderAdminSetup() {
         document.querySelector(`.strokes-count-input[data-player-id="${playerId}"]`).value || "0",
         10
       );
-      const holes = hardestHoles(count);
+      const avoidClosing = document.querySelector(`.avoid-closing-checkbox[data-player-id="${playerId}"]`).checked;
+      const holes = hardestHoles(count, avoidClosing ? [9, 18] : []);
       document
         .querySelectorAll(`.strokes-toggle-strip[data-player-id="${playerId}"] .hole-toggle-btn`)
-        .forEach((holeBtn) => {
-          const h = parseInt(holeBtn.dataset.hole, 10);
+        .forEach((holeBox) => {
+          const h = parseInt(holeBox.dataset.hole, 10);
           const strokeCount = holes.filter((x) => x === h).length;
-          holeBtn.dataset.strokeCount = strokeCount;
-          holeBtn.textContent = strokeCount > 1 ? String(strokeCount) : "";
-          holeBtn.classList.toggle("toggled", strokeCount > 0);
+          holeBox.dataset.strokeCount = strokeCount;
+          holeBox.textContent = strokeCount > 1 ? String(strokeCount) : "";
+          holeBox.classList.toggle("toggled", strokeCount > 0);
         });
     });
   });
@@ -389,6 +387,16 @@ function currentHoleFor(matchId, data) {
   return currentHoleByMatch[matchId];
 }
 
+// Extra class for the small corner dot marking "someone gets a stroke
+// here," independent of the box's own win/loss/halve color.
+function strokeDotClass(data, holeNum) {
+  const { a, b } = strokeSidesForHole(data, holeNum);
+  if (a && b) return " stroke-dot-both";
+  if (a) return " stroke-dot-a";
+  if (b) return " stroke-dot-b";
+  return "";
+}
+
 function renderMatchCard(matchId) {
   const data = matchesById[matchId] || {};
   const sideA = data.sideA || [];
@@ -424,7 +432,7 @@ function renderMatchCard(matchId) {
   for (let h = 1; h <= 18; h++) {
     const selected = h === currentHole ? " selected" : "";
     navNumbers += `<div class="hole-num">${h}</div>`;
-    navBoxes += `<button type="button" class="hole-nav-btn ${holeBoxClass(holes[String(h)], h, data)}${selected}"
+    navBoxes += `<button type="button" class="hole-nav-btn ${holeBoxClass(holes[String(h)], h, data)}${selected}${strokeDotClass(data, h)}"
                    data-match-id="${matchId}" data-goto-hole="${h}" aria-label="Hole ${h}"></button>`;
     if (h === 9) {
       navNumbers += `<div class="hole-gap"></div>`;

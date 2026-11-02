@@ -14,7 +14,7 @@ import {
   onSnapshot,
 } from "https://www.gstatic.com/firebasejs/11.3.1/firebase-firestore.js";
 import { ROUNDS, pointsAvailable, TOTAL_POINTS_AVAILABLE } from "./rounds-config.js";
-import { scoreMatch, sumMatchPoints, holeWinner } from "./scoring.js";
+import { scoreMatch, sumMatchPoints, holeWinner, strokeSidesForHole } from "./scoring.js";
 
 const app = document.getElementById("app");
 app.innerHTML = `
@@ -54,13 +54,24 @@ function holeBoxClass(hole, holeNum, data) {
   return "hole-empty";
 }
 
+// Same corner-dot marker as the round pages -- blue/red for which
+// side has a player getting a stroke here, independent of the box's
+// own win/loss/halve fill.
+function strokeDotClass(data, holeNum) {
+  const { a, b } = strokeSidesForHole(data, holeNum);
+  if (a && b) return " stroke-dot-both";
+  if (a) return " stroke-dot-a";
+  if (b) return " stroke-dot-b";
+  return "";
+}
+
 function holeStrip(data) {
   const holes = data.holes || {};
   let numbers = "";
   let boxes = "";
   for (let h = 1; h <= 18; h++) {
     numbers += `<div class="hole-num">${h}</div>`;
-    boxes += `<div class="hole-box ${holeBoxClass(holes[String(h)], h, data)}"></div>`;
+    boxes += `<div class="hole-box ${holeBoxClass(holes[String(h)], h, data)}${strokeDotClass(data, h)}"></div>`;
     if (h === 9) {
       numbers += `<div class="hole-gap"></div>`;
       boxes += `<div class="hole-gap"></div>`;
