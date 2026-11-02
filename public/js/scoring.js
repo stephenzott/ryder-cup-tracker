@@ -20,13 +20,25 @@ function sideStrokes(value) {
   return Array.isArray(value) ? Math.min(...value) : value;
 }
 
-// Match-play "net" for a single hole, from Team A's perspective:
-// +1 if A won the hole, -1 if B won it, 0 if halved.
-function holeNet(hole) {
+// Who won a single hole: 'a', 'b', 'halved', or null if it hasn't
+// been entered for both sides yet. Exported because the scoreboard
+// page wants this directly (to color a box per hole) without caring
+// about margins or points at all.
+export function holeWinner(hole) {
+  if (!hole || hole.a == null || hole.b == null) return null;
   const a = sideStrokes(hole.a);
   const b = sideStrokes(hole.b);
-  if (a < b) return 1;
-  if (b < a) return -1;
+  if (a < b) return "a";
+  if (b < a) return "b";
+  return "halved";
+}
+
+// Match-play "net" for a single hole, from Team A's perspective:
+// +1 if A won the hole, -1 if B won it, 0 if halved (or not played).
+function holeNet(hole) {
+  const winner = holeWinner(hole);
+  if (winner === "a") return 1;
+  if (winner === "b") return -1;
   return 0;
 }
 

@@ -139,6 +139,53 @@ button.secondary {
   margin: 0.75rem 0 0;
 }
 
+/* The scoreboard's momentum strip: one small box per hole, no numbers
+   or scores in them on purpose -- just color. display:block+overflow
+   on the row (not a <table>, so the earlier table-scroll rule doesn't
+   apply) keeps it swipeable on a phone without squeezing 18 boxes
+   into a too-narrow screen. */
+.hole-strip-numbers,
+.hole-strip {
+  display: flex;
+  gap: 2px;
+  overflow-x: auto;
+  margin-top: 0.4rem;
+}
+
+.hole-num {
+  flex: 0 0 1.5rem;
+  text-align: center;
+  font-size: 0.75rem;
+  color: #666;
+}
+
+.hole-box {
+  flex: 0 0 1.5rem;
+  height: 1.5rem;
+  border-radius: 3px;
+}
+
+.hole-gap {
+  flex: 0 0 0.5rem;
+}
+
+.hole-usa {
+  background: #2962ff;
+}
+
+.hole-eur {
+  background: #d32f2f;
+}
+
+.hole-halved {
+  background: #9e9e9e;
+}
+
+.hole-empty {
+  background: #eee;
+  border: 1px solid #ddd;
+}
+
 .match-card input[type="number"] {
   width: 3.5rem;
   text-align: center;
