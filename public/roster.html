@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Roster — Ryder Cup Trip</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <nav>
+    <a href="index.html">Home</a>
+    <a href="schedule.html">Schedule</a>
+    <a href="roster.html">Roster</a>
+    <a href="round1.html">Round 1</a>
+    <a href="round2.html">Round 2</a>
+    <a href="round3.html">Round 3</a>
+    <a href="round4.html">Round 4</a>
+  </nav>
+
+  <h1>Roster</h1>
+  <p>Handicap Index is shown for reference only — it isn't used in match scoring yet.</p>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Player</th>
+        <th>Handicap Index</th>
+        <th>Team</th>
+        <th id="roster-admin-col" style="display: none"></th>
+      </tr>
+    </thead>
+    <tbody id="roster-rows">
+      <tr><td colspan="4">Loading…</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Admin</h2>
+  <p>Add, remove, or reassign players. Requires the admin code.</p>
+  <div id="unlock"></div>
+
+  <div id="admin-controls" class="locked">
+    <h3>Add player</h3>
+    <form id="add-player-form">
+      <input type="text" id="new-player-name" placeholder="Player name" required />
+      <input type="number" id="new-player-handicap" placeholder="Handicap index" step="0.1" />
+      <select id="new-player-team">
+        <option value="">Unassigned</option>
+        <option value="A">Team A</option>
+        <option value="B">Team B</option>
+      </select>
+      <button type="submit">Add player</button>
+      <span class="status-msg" id="add-player-status"></span>
+    </form>
+  </div>
+
+  <script type="module" src="js/roster.js"></script>
+</body>
+</html>
