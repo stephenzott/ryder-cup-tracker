@@ -11,7 +11,7 @@ import {
   onSnapshot,
 } from "https://www.gstatic.com/firebasejs/11.3.1/firebase-firestore.js";
 import { ROUNDS, pointsAvailable, TOTAL_POINTS_AVAILABLE } from "./rounds-config.js";
-import { scoreMatch } from "./scoring.js";
+import { sumMatchPoints } from "./scoring.js";
 
 document.getElementById("intro-blurb").textContent =
   `16 players, 4 rounds, straight Nassau scoring (1 point front 9, 1 point back 9, ` +
@@ -64,15 +64,8 @@ render();
 
 for (const round of ROUNDS) {
   onSnapshot(collection(db, "rounds", round.id, "matches"), (snapshot) => {
-    let a = 0;
-    let b = 0;
-    snapshot.forEach((docSnap) => {
-      const holes = docSnap.data().holes || {};
-      const points = scoreMatch(holes).points;
-      a += points.a;
-      b += points.b;
-    });
-    roundTotals[round.id] = { a, b };
+    const matches = snapshot.docs.map((docSnap) => docSnap.data());
+    roundTotals[round.id] = sumMatchPoints(matches);
     render();
   });
 }

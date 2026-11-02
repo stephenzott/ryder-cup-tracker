@@ -88,3 +88,20 @@ export function scoreMatch(holes) {
     },
   };
 }
+
+// Convenience for anything that needs a round (or the whole trip's)
+// point total: pass an array of match data objects (each just needs a
+// `holes` field, e.g. straight off a Firestore snapshot) and get back
+// the summed { a, b } points. Used by both the standings page (across
+// all of a round's matches) and each round page (same thing, scoped to
+// just that round).
+export function sumMatchPoints(matches) {
+  let a = 0;
+  let b = 0;
+  for (const match of matches) {
+    const points = scoreMatch(match.holes || {}).points;
+    a += points.a;
+    b += points.b;
+  }
+  return { a, b };
+}

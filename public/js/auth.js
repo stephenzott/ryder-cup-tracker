@@ -61,6 +61,15 @@ function getCachedLevel() {
   return localStorage.getItem(STORAGE_KEY);
 }
 
+// Exposed for pages that need to tell "score" and "admin" apart in
+// their own UI (e.g. a round page showing admin-only pairing controls
+// alongside score-entry controls everyone can use) rather than just
+// asking "am I unlocked enough for X." Same localStorage-only caveat
+// as everywhere else in this file -- real enforcement is server-side.
+export function getUnlockLevel() {
+  return getCachedLevel();
+}
+
 // 'admin' unlocks everything 'score' does (see firestore.rules), so a
 // page that only needs 'score' should also accept an 'admin' unlock.
 function levelSatisfies(cachedLevel, requiredLevel) {

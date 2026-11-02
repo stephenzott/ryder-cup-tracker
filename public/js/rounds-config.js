@@ -5,6 +5,14 @@
 //
 // `id` is also the Firestore subcollection path: matches for round 1
 // live at rounds/round1/matches/{matchId}.
+// playersPerSide: how many players make up one side of a match (2 for
+// the team formats, 1 for singles).
+//
+// holeShape: how a side's score for one hole is recorded --
+//   "single"    one shared number (scramble/greensomes: the team plays
+//               one ball; singles: there's only one player anyway)
+//   "perPlayer" an array of each player's own strokes (best ball: each
+//               player plays their own ball, side score = the better one)
 export const ROUNDS = [
   {
     id: "round1",
@@ -13,6 +21,8 @@ export const ROUNDS = [
     course: "Blackwolf Run — River",
     format: "Scramble",
     matchCount: 4,
+    playersPerSide: 2,
+    holeShape: "single",
   },
   {
     id: "round2",
@@ -21,6 +31,8 @@ export const ROUNDS = [
     course: "Blackwolf Run — Meadow Valleys",
     format: "Greensomes",
     matchCount: 4,
+    playersPerSide: 2,
+    holeShape: "single",
   },
   {
     id: "round3",
@@ -29,6 +41,8 @@ export const ROUNDS = [
     course: "Whistling Straits — Straits",
     format: "Best Ball",
     matchCount: 4,
+    playersPerSide: 2,
+    holeShape: "perPlayer",
   },
   {
     id: "round4",
@@ -37,6 +51,8 @@ export const ROUNDS = [
     course: "Whistling Straits — Irish",
     format: "Singles",
     matchCount: 8,
+    playersPerSide: 1,
+    holeShape: "single",
   },
 ];
 
