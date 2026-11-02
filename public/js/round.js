@@ -23,7 +23,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/11.3.1/firebase-firestore.js";
 import { ROUNDS, pointsAvailable } from "./rounds-config.js";
 import { COURSES } from "./courses-config.js";
-import { scoreMatch, sumMatchPoints } from "./scoring.js";
+import { scoreMatch, sumMatchPoints, holeWinner } from "./scoring.js";
 
 const app = document.getElementById("app");
 const roundId = app.dataset.roundId;
@@ -63,6 +63,12 @@ let isAdminUnlocked = false;
 // Live data, kept current by the two onSnapshot listeners below.
 let players = [];
 let matchesById = {};
+
+// Which hole's entry panel each match is currently showing (1-18).
+// Purely local UI state -- never written to Firestore -- so it
+// survives re-renders but resets if you reload the page. Set lazily
+// the first time a match is rendered (see currentHoleFor below).
+const currentHoleByMatch = {};
 
 function playerName(id) {
   const p = players.find((pl) => pl.id === id);
@@ -174,6 +180,30 @@ function holeInputValue(data, holeNum, side) {
   return v == null ? "" : v;
 }
 
+// Same box-coloring convention as the scoreboard page (blue/red/grey/
+// empty) -- reusing it here means the hole navigator doubles as a
+// mini momentum view for just this match, not just a hole picker.
+function holeBoxClass(hole) {
+  const winner = holeWinner(hole);
+  if (winner === "a") return "hole-usa";
+  if (winner === "b") return "hole-eur";
+  if (winner === "halved") return "hole-halved";
+  return "hole-empty";
+}
+
+// Which hole's entry panel to show for a match by default: the first
+// one that's missing a score for either side, or 18 if the whole
+// match is fully entered. Only computed once per match (see the
+// currentHoleByMatch cache) so it doesn't jump around on every
+// re-render while someone's actively using it.
+function currentHoleFor(matchId, holes) {
+  if (currentHoleByMatch[matchId] == null) {
+    const firstOpen = course.holes.find((h) => holeWinner(holes[String(h.hole)]) == null);
+    currentHoleByMatch[matchId] = firstOpen ? firstOpen.hole : 18;
+  }
+  return currentHoleByMatch[matchId];
+}
+
 function renderMatchCard(matchId) {
   const data = matchesById[matchId] || {};
   const sideA = data.sideA || [];
@@ -190,27 +220,8 @@ function renderMatchCard(matchId) {
 
   const aNames = sideA.map(playerName).join(" & ") || "TBD";
   const bNames = sideB.map(playerName).join(" & ") || "TBD";
-  const scored = scoreMatch(data.holes || {});
-
-  const holesRows = course.holes
-    .map((h) => {
-      const aVal = holeInputValue(data, h.hole, "a");
-      const bVal = holeInputValue(data, h.hole, "b");
-      return `
-        <tr>
-          <td>${h.hole}</td>
-          <td>${h.par}</td>
-          <td>${h.strokeIndex}</td>
-          <td><input type="number" min="1" max="15" inputmode="numeric"
-                data-match-id="${matchId}" data-hole="${h.hole}" data-side="a"
-                value="${aVal}" ${isScoreUnlocked ? "" : "disabled"} /></td>
-          <td><input type="number" min="1" max="15" inputmode="numeric"
-                data-match-id="${matchId}" data-hole="${h.hole}" data-side="b"
-                value="${bVal}" ${isScoreUnlocked ? "" : "disabled"} /></td>
-        </tr>
-      `;
-    })
-    .join("");
+  const holes = data.holes || {};
+  const scored = scoreMatch(holes);
 
   // Projected points only mean anything once at least one hole is in
   // -- before that every segment reads as a meaningless 0.5/0.5 halve.
@@ -219,6 +230,24 @@ function renderMatchCard(matchId) {
     holesEntered > 0
       ? ` <span class="status-msg">(projected if it held: USA ${scored.projected.a}, EUR ${scored.projected.b})</span>`
       : "";
+
+  const currentHole = currentHoleFor(matchId, holes);
+  const holeInfo = course.holes[currentHole - 1];
+  const aVal = holeInputValue(data, currentHole, "a");
+  const bVal = holeInputValue(data, currentHole, "b");
+
+  let navNumbers = "";
+  let navBoxes = "";
+  for (let h = 1; h <= 18; h++) {
+    const selected = h === currentHole ? " selected" : "";
+    navNumbers += `<div class="hole-num">${h}</div>`;
+    navBoxes += `<button type="button" class="hole-nav-btn ${holeBoxClass(holes[String(h)])}${selected}"
+                   data-match-id="${matchId}" data-goto-hole="${h}" aria-label="Hole ${h}"></button>`;
+    if (h === 9) {
+      navNumbers += `<div class="hole-gap"></div>`;
+      navBoxes += `<div class="hole-gap"></div>`;
+    }
+  }
 
   return `
     <div class="match-card">
@@ -229,33 +258,94 @@ function renderMatchCard(matchId) {
         Overall: <strong>${statusLabel(scored.overall)}</strong><br>
         Points so far — USA ${scored.points.a}, EUR ${scored.points.b}${projectedLine}
       </p>
-      <table>
-        <thead><tr><th>Hole</th><th>Par</th><th>Idx</th><th>USA</th><th>EUR</th></tr></thead>
-        <tbody>${holesRows}</tbody>
-      </table>
+
+      <div class="hole-strip-numbers">${navNumbers}</div>
+      <div class="hole-strip">${navBoxes}</div>
+
+      <div class="hole-entry">
+        <button type="button" class="secondary prev-hole" data-match-id="${matchId}" ${currentHole <= 1 ? "disabled" : ""}>◀ Prev</button>
+        <strong>Hole ${currentHole}</strong> — Par ${holeInfo.par}, Stroke Index ${holeInfo.strokeIndex}
+        <button type="button" class="secondary next-hole" data-match-id="${matchId}" ${currentHole >= 18 ? "disabled" : ""}>Next ▶</button>
+        <div>
+          <label>USA
+            <input type="number" min="1" max="15" inputmode="numeric" class="hole-score-input"
+                   data-match-id="${matchId}" data-hole="${currentHole}" data-side="a"
+                   value="${aVal}" ${isScoreUnlocked ? "" : "disabled"} />
+          </label>
+          <label>EUR
+            <input type="number" min="1" max="15" inputmode="numeric" class="hole-score-input"
+                   data-match-id="${matchId}" data-hole="${currentHole}" data-side="b"
+                   value="${bVal}" ${isScoreUnlocked ? "" : "disabled"} />
+          </label>
+          <button type="button" class="save-hole" data-match-id="${matchId}" ${isScoreUnlocked ? "" : "disabled"}>Save</button>
+          <span class="status-msg" data-save-status="${matchId}-hole"></span>
+        </div>
+      </div>
     </div>
   `;
 }
 
+function goToHole(matchId, hole) {
+  currentHoleByMatch[matchId] = Math.min(18, Math.max(1, hole));
+  renderMatches();
+}
+
 function renderMatches() {
-  // If a hole input is focused when this re-renders (e.g. because
+  // If a score input is focused when this re-renders (e.g. because
   // someone on another phone just saved a different match), rebuild
   // the DOM but put the cursor back where it was instead of silently
-  // dropping focus out from under whoever's mid-entry.
+  // dropping focus out from under whoever's mid-entry. Since the
+  // current hole is stable across a re-render (it's in
+  // currentHoleByMatch, not derived fresh each time), matching on
+  // match+side is enough -- the hole number will be the same input.
   const active = document.activeElement;
   const activeSelector =
-    active && active.matches('#matches input[type="number"]')
-      ? `input[data-match-id="${active.dataset.matchId}"][data-hole="${active.dataset.hole}"][data-side="${active.dataset.side}"]`
+    active && active.matches(".hole-score-input")
+      ? `.hole-score-input[data-match-id="${active.dataset.matchId}"][data-side="${active.dataset.side}"]`
       : null;
 
   document.getElementById("matches").innerHTML = matchIds().map(renderMatchCard).join("");
 
-  document.querySelectorAll('#matches input[type="number"]').forEach((input) => {
-    input.addEventListener("change", async (e) => {
-      const { matchId, hole, side } = e.target.dataset;
-      const raw = e.target.value;
-      const value = raw === "" ? null : parseInt(raw, 10);
-      await updateDoc(matchRef(matchId), { [`holes.${hole}.${side}`]: value });
+  document.querySelectorAll(".hole-nav-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      goToHole(btn.dataset.matchId, parseInt(btn.dataset.gotoHole, 10));
+    });
+  });
+
+  document.querySelectorAll(".prev-hole").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      goToHole(btn.dataset.matchId, currentHoleByMatch[btn.dataset.matchId] - 1);
+    });
+  });
+
+  document.querySelectorAll(".next-hole").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      goToHole(btn.dataset.matchId, currentHoleByMatch[btn.dataset.matchId] + 1);
+    });
+  });
+
+  document.querySelectorAll(".save-hole").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const matchId = btn.dataset.matchId;
+      const card = btn.closest(".match-card");
+      const hole = currentHoleByMatch[matchId];
+      const aInput = card.querySelector('.hole-score-input[data-side="a"]');
+      const bInput = card.querySelector('.hole-score-input[data-side="b"]');
+      const aValue = aInput.value === "" ? null : parseInt(aInput.value, 10);
+      const bValue = bInput.value === "" ? null : parseInt(bInput.value, 10);
+
+      await updateDoc(matchRef(matchId), {
+        [`holes.${hole}.a`]: aValue,
+        [`holes.${hole}.b`]: bValue,
+      });
+
+      // Once both scores for this hole are in, move on to the next
+      // one automatically -- matches walking down the fairway hole by
+      // hole rather than making you click "Next" every time.
+      if (aValue != null && bValue != null && hole < 18) {
+        currentHoleByMatch[matchId] = hole + 1;
+      }
+      renderMatches();
     });
   });
 
