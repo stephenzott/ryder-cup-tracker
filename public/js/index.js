@@ -1,7 +1,9 @@
 // Live home-page standings. Subscribes to every round's matches
-// subcollection and re-derives Team A / Team B point totals from raw
-// hole scores any time anything changes — for anyone with the page
-// open, from anyone else's phone.
+// subcollection and re-derives United States / Europe point totals
+// from raw hole scores any time anything changes — for anyone with
+// the page open, from anyone else's phone. Internally still uses
+// generic 'a'/'b' side identifiers (matches the Firestore data and
+// scoring.js) -- team A = United States, team B = Europe.
 
 import { db } from "./firebase-init.js";
 import {

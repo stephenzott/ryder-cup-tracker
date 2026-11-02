@@ -29,8 +29,8 @@ let latestPlayers = [];
 let isAdminUnlocked = false;
 
 function teamLabel(team) {
-  if (team === "A") return "Team A";
-  if (team === "B") return "Team B";
+  if (team === "A") return "United States";
+  if (team === "B") return "Europe";
   return "—";
 }
 
@@ -48,8 +48,8 @@ function renderTable() {
         ? `<td>
              <select data-id="${p.id}" class="team-select">
                <option value="" ${!p.team ? "selected" : ""}>Unassigned</option>
-               <option value="A" ${p.team === "A" ? "selected" : ""}>Team A</option>
-               <option value="B" ${p.team === "B" ? "selected" : ""}>Team B</option>
+               <option value="A" ${p.team === "A" ? "selected" : ""}>United States</option>
+               <option value="B" ${p.team === "B" ? "selected" : ""}>Europe</option>
              </select>
              <button type="button" class="secondary remove-player" data-id="${p.id}">Remove</button>
            </td>`
