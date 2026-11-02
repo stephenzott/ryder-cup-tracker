@@ -24,23 +24,28 @@ document.getElementById("intro-blurb").textContent =
 // round-trips first.
 const roundTotals = {};
 for (const round of ROUNDS) {
-  roundTotals[round.id] = { a: 0, b: 0 };
+  roundTotals[round.id] = { a: 0, b: 0, projectedA: 0, projectedB: 0 };
 }
 
 function render() {
   let totalA = 0;
   let totalB = 0;
+  let projTotalA = 0;
+  let projTotalB = 0;
 
   const rowsHtml = ROUNDS.map((round) => {
-    const { a, b } = roundTotals[round.id];
+    const { a, b, projectedA, projectedB } = roundTotals[round.id];
     totalA += a;
     totalB += b;
+    projTotalA += projectedA;
+    projTotalB += projectedB;
     return `
       <tr>
         <td>${round.day} — ${round.course.split("—").pop().trim()} (${round.format})</td>
         <td>${pointsAvailable(round)}</td>
         <td>${a}</td>
         <td>${b}</td>
+        <td>${projectedA} – ${projectedB}</td>
       </tr>
     `;
   }).join("");
@@ -53,11 +58,14 @@ function render() {
         <td><strong>${TOTAL_POINTS_AVAILABLE}</strong></td>
         <td><strong>${totalA}</strong></td>
         <td><strong>${totalB}</strong></td>
+        <td><strong>${projTotalA} – ${projTotalB}</strong></td>
       </tr>
     `;
 
   document.getElementById("score-a").textContent = totalA;
   document.getElementById("score-b").textContent = totalB;
+  document.getElementById("projected-a").textContent = projTotalA;
+  document.getElementById("projected-b").textContent = projTotalB;
 }
 
 render();

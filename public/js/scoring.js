@@ -53,8 +53,21 @@ function marginForRange(holes, startHole, endHole) {
 // just means "not enough holes played yet," not "halved."
 function pointsForSegment(segment) {
   if (!segment.complete) return { a: 0, b: 0 };
-  if (segment.margin > 0) return { a: 1, b: 0 };
-  if (segment.margin < 0) return { a: 0, b: 1 };
+  return marginToPoints(segment.margin);
+}
+
+// "If the current margin held" version -- same scoring, but doesn't
+// wait for the segment to be complete. Used for a projected/"what if
+// it ended right now" display alongside the real, only-counts-when-
+// finished points. Whoever's currently ahead gets the full point here
+// even mid-segment; it's a what-if, not a partial award.
+function projectedPointsForSegment(segment) {
+  return marginToPoints(segment.margin);
+}
+
+function marginToPoints(margin) {
+  if (margin > 0) return { a: 1, b: 0 };
+  if (margin < 0) return { a: 0, b: 1 };
   return { a: 0.5, b: 0.5 };
 }
 
@@ -78,13 +91,26 @@ export function scoreMatch(holes) {
   const backPts = pointsForSegment(back);
   const overallPts = pointsForSegment(overall);
 
+  const frontProj = projectedPointsForSegment(front);
+  const backProj = projectedPointsForSegment(back);
+  const overallProj = projectedPointsForSegment(overall);
+
   return {
     front,
     back,
     overall,
+    // Real points: only ever nonzero once a segment is actually done.
     points: {
       a: frontPts.a + backPts.a + overallPts.a,
       b: frontPts.b + backPts.b + overallPts.b,
+    },
+    // Projected points: "if the current margin on every segment held
+    // as-is." Equals `points` once everything's complete. Meaningless
+    // before any holes are entered (every segment reads as a 0.5/0.5
+    // halve) -- callers should check holesEntered > 0 before showing it.
+    projected: {
+      a: frontProj.a + backProj.a + overallProj.a,
+      b: frontProj.b + backProj.b + overallProj.b,
     },
   };
 }
@@ -92,16 +118,17 @@ export function scoreMatch(holes) {
 // Convenience for anything that needs a round (or the whole trip's)
 // point total: pass an array of match data objects (each just needs a
 // `holes` field, e.g. straight off a Firestore snapshot) and get back
-// the summed { a, b } points. Used by both the standings page (across
-// all of a round's matches) and each round page (same thing, scoped to
-// just that round).
+// the summed real AND projected points. Used by both the standings
+// page (across all of a round's matches) and each round page (same
+// thing, scoped to just that round).
 export function sumMatchPoints(matches) {
-  let a = 0;
-  let b = 0;
+  const totals = { a: 0, b: 0, projectedA: 0, projectedB: 0 };
   for (const match of matches) {
-    const points = scoreMatch(match.holes || {}).points;
-    a += points.a;
-    b += points.b;
+    const scored = scoreMatch(match.holes || {});
+    totals.a += scored.points.a;
+    totals.b += scored.points.b;
+    totals.projectedA += scored.projected.a;
+    totals.projectedB += scored.projected.b;
   }
-  return { a, b };
+  return totals;
 }

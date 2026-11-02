@@ -212,6 +212,14 @@ function renderMatchCard(matchId) {
     })
     .join("");
 
+  // Projected points only mean anything once at least one hole is in
+  // -- before that every segment reads as a meaningless 0.5/0.5 halve.
+  const holesEntered = scored.front.holesEntered + scored.back.holesEntered;
+  const projectedLine =
+    holesEntered > 0
+      ? ` <span class="status-msg">(projected if it held: USA ${scored.projected.a}, EUR ${scored.projected.b})</span>`
+      : "";
+
   return `
     <div class="match-card">
       <h3>${matchId.replace("match", "Match ")}: USA (${aNames}) vs EUR (${bNames})</h3>
@@ -219,7 +227,7 @@ function renderMatchCard(matchId) {
         Front 9: <strong>${statusLabel(scored.front)}</strong> ·
         Back 9: <strong>${statusLabel(scored.back)}</strong> ·
         Overall: <strong>${statusLabel(scored.overall)}</strong><br>
-        Points so far — USA ${scored.points.a}, EUR ${scored.points.b}
+        Points so far — USA ${scored.points.a}, EUR ${scored.points.b}${projectedLine}
       </p>
       <table>
         <thead><tr><th>Hole</th><th>Par</th><th>Idx</th><th>USA</th><th>EUR</th></tr></thead>
@@ -258,7 +266,8 @@ function renderMatches() {
 
   const totals = sumMatchPoints(Object.values(matchesById));
   document.getElementById("round-total").textContent =
-    `Round total — USA ${totals.a}, EUR ${totals.b} (of ${pointsAvailable(round)} available)`;
+    `Round total — USA ${totals.a}, EUR ${totals.b} (of ${pointsAvailable(round)} available) · ` +
+    `projected if current margins held: USA ${totals.projectedA}, EUR ${totals.projectedB}`;
 }
 
 function render() {
