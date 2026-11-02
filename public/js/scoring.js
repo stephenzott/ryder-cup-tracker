@@ -73,7 +73,12 @@ function pointsForSegment(segment) {
 // it ended right now" display alongside the real, only-counts-when-
 // finished points. Whoever's currently ahead gets the full point here
 // even mid-segment; it's a what-if, not a partial award.
+//
+// A segment with ZERO holes entered isn't "currently tied" -- it just
+// hasn't started, so it shouldn't contribute anything (not even a
+// phantom 0.5/0.5 halve) to the projection yet.
 function projectedPointsForSegment(segment) {
+  if (segment.holesEntered === 0) return { a: 0, b: 0 };
   return marginToPoints(segment.margin);
 }
 
@@ -117,9 +122,10 @@ export function scoreMatch(holes) {
       b: frontPts.b + backPts.b + overallPts.b,
     },
     // Projected points: "if the current margin on every segment held
-    // as-is." Equals `points` once everything's complete. Meaningless
-    // before any holes are entered (every segment reads as a 0.5/0.5
-    // halve) -- callers should check holesEntered > 0 before showing it.
+    // as-is." Equals `points` once everything's complete. A segment
+    // that hasn't started yet contributes nothing (not a phantom
+    // halve) -- so e.g. 2up on the front with the back untouched
+    // projects as a clean 2-0 (1 for front, 1 for overall), not 2.5-0.5.
     projected: {
       a: frontProj.a + backProj.a + overallProj.a,
       b: frontProj.b + backProj.b + overallProj.b,
