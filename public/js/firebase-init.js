@@ -25,9 +25,16 @@ import { getAuth } from "https://www.gstatic.com/firebasejs/11.3.1/firebase-auth
 
 const app = initializeApp(firebaseConfig);
 
+// This project's Firestore free-tier "(default)" database is already
+// used by another one of your apps, so this app lives in its own
+// NAMED database within the same project instead. getFirestore's
+// second argument picks which database to connect to — omitting it
+// would silently connect to "(default)" and find nothing here.
+const DATABASE_ID = "ryder-cup-tracker";
+
 // These two objects are the handles every other script in the app uses
 // to talk to Firestore (the database) and Auth (anonymous sign-in).
 // Exporting them here means every page sets this up exactly once, the
 // same way.
-export const db = getFirestore(app);
+export const db = getFirestore(app, DATABASE_ID);
 export const auth = getAuth(app);

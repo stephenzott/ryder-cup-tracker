@@ -8,6 +8,7 @@
     ]
   },
   "firestore": {
+    "database": "ryder-cup-tracker",
     "rules": "firestore.rules",
     "indexes": "firestore.indexes.json"
   }
