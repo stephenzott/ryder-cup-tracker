@@ -6,6 +6,9 @@
 golf-trip-site/
 golf-trip-tracker.zip
 
+# Personal files that land in this folder but aren't part of the app
+GolfScoreboard.zip
+
 # Firebase CLI local state/logs
 .firebase/
 firebase-debug.log
