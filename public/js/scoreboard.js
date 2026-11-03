@@ -15,6 +15,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/11.3.1/firebase-firestore.js";
 import { ROUNDS, pointsAvailable, TOTAL_POINTS_AVAILABLE } from "./rounds-config.js";
 import { scoreMatch, sumMatchPoints, holeWinner, strokeSidesForHole } from "./scoring.js";
+import { playerLink } from "./player-stats.js";
 
 const app = document.getElementById("app");
 app.innerHTML = `
@@ -33,6 +34,10 @@ for (const round of ROUNDS) {
 function playerName(id) {
   const p = players.find((pl) => pl.id === id);
   return p ? p.name : "(unknown)";
+}
+
+function namesLinked(ids) {
+  return ids.map((id) => playerLink(id, playerName(id))).join(" & ");
 }
 
 function statusLabel(segment) {
@@ -84,8 +89,8 @@ function holeStrip(data) {
 }
 
 function renderMatchRow(matchId, data) {
-  const aNames = (data.sideA || []).map(playerName).join(" & ") || "TBD";
-  const bNames = (data.sideB || []).map(playerName).join(" & ") || "TBD";
+  const aNames = namesLinked(data.sideA || []) || "TBD";
+  const bNames = namesLinked(data.sideB || []) || "TBD";
   const scored = scoreMatch(data);
 
   return `

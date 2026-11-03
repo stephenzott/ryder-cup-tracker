@@ -24,6 +24,7 @@ import {
 import { ROUNDS, pointsAvailable } from "./rounds-config.js";
 import { COURSES } from "./courses-config.js";
 import { scoreMatch, sumMatchPoints, holeWinner, strokeSidesForHole } from "./scoring.js";
+import { playerLink } from "./player-stats.js";
 
 const app = document.getElementById("app");
 const roundId = app.dataset.roundId;
@@ -73,6 +74,10 @@ const currentHoleByMatch = {};
 function playerName(id) {
   const p = players.find((pl) => pl.id === id);
   return p ? p.name : "(unknown)";
+}
+
+function namesLinked(ids) {
+  return ids.map((id) => playerLink(id, playerName(id))).join(" & ");
 }
 
 function matchRef(matchId) {
@@ -157,7 +162,7 @@ function renderStrokesGivenRow(matchId, data) {
       const current = (data.strokesGiven && data.strokesGiven[pid]) || [];
       return `
         <div class="strokes-player">
-          <strong>${playerName(pid)}</strong>
+          <strong>${playerLink(pid, playerName(pid))}</strong>
           <input type="number" min="0" max="36" class="strokes-count-input" data-player-id="${pid}" value="${current.length}" />
           <label><input type="checkbox" class="avoid-closing-checkbox" data-player-id="${pid}" /> Avoid 9 &amp; 18</label>
           <button type="button" class="secondary apply-strokes" data-player-id="${pid}">Apply to hardest holes</button>
@@ -352,7 +357,7 @@ function renderHoleInputs(matchId, data, currentHole, sideA, sideB) {
         const val = holeInputValue(data, currentHole, side, i);
         const badge = strokeBadge(strokesOnHoleFor(data, pid, currentHole));
         return `
-          <label>${playerName(pid)}${badge}
+          <label>${playerLink(pid, playerName(pid))}${badge}
             <input type="number" min="1" max="15" inputmode="numeric" class="hole-score-input"
                    data-match-id="${matchId}" data-side="${side}" data-player-index="${i}"
                    value="${val}" ${isScoreUnlocked ? "" : "disabled"} />
@@ -418,8 +423,8 @@ function renderMatchCard(matchId) {
     `;
   }
 
-  const aNames = sideA.map(playerName).join(" & ") || "TBD";
-  const bNames = sideB.map(playerName).join(" & ") || "TBD";
+  const aNames = namesLinked(sideA) || "TBD";
+  const bNames = namesLinked(sideB) || "TBD";
   const holes = data.holes || {};
   const scored = scoreMatch(data);
 

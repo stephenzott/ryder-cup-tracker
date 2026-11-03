@@ -14,6 +14,7 @@ import {
   orderBy,
   query,
 } from "https://www.gstatic.com/firebasejs/11.3.1/firebase-firestore.js";
+import { playerLink } from "./player-stats.js";
 
 const rowsEl = document.getElementById("roster-rows");
 const adminColHeader = document.getElementById("roster-admin-col");
@@ -57,7 +58,7 @@ function renderTable() {
 
       return `
         <tr>
-          <td>${escapeHtml(p.name)}</td>
+          <td>${playerLink(p.id, escapeHtml(p.name))}</td>
           <td>${p.handicapIndex ?? "—"}</td>
           <td>${teamLabel(p.team)}</td>
           ${adminCell}
