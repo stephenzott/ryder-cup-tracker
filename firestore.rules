@@ -6,21 +6,29 @@ rules_version = '2';
 //    gives each browser a stable `request.auth.uid` — not an identity,
 //    just a way for Firestore rules to recognize "this same device/tab
 //    asked before."
-// 2. The app asks once for a code ("score" code for entering results,
-//    or the stricter "admin" code for roster changes). That attempt is
-//    written to /unlocks/{uid} — a document only that uid can ever read.
-// 3. The real codes live in /secrets/config, a document NO ONE can read
-//    or write directly (allow read, write: if false below). Rules can
-//    still privately compare against it using get() — that's a trusted
-//    internal read, not a client read — so the actual code values never
-//    travel back to any browser.
+// 2. For score entry, the app asks "Who are you?" and the visitor picks
+//    their own name off the roster (no code). For admin actions
+//    (pairings, roster changes) it's still a shared code, since those
+//    are rare. Either way, the attempt is written to /unlocks/{uid} — a
+//    document only that uid can ever read -- as either {level: 'score',
+//    playerId} or {level: 'admin', code}.
+// 3. The real admin code lives in /secrets/config, a document NO ONE can
+//    read or write directly (allow read, write: if false below). Rules
+//    can still privately compare against it using get() — that's a
+//    trusted internal read, not a client read — so the actual code
+//    value never travels back to any browser.
 // 4. Every other collection checks /unlocks/{uid}'s `level` field to
-//    decide what a given browser is allowed to write.
+//    decide what a given browser is allowed to write -- and for score-
+//    level match updates, also checks that uid's `playerId` against the
+//    specific match's sideA/sideB, so a player can only enter scores
+//    for a match they're actually in (see myPlayerId() below).
 //
 // This is a light deterrent for a friends' trip, not bank-grade
 // security: Firestore doesn't rate-limit writes, so someone could
-// script repeated guesses at /unlocks. Good enough to stop idle
-// strangers and typos; not a defense against a motivated attacker.
+// script repeated guesses at /unlocks, or just pick someone else's name
+// off the roster. Good enough to stop idle strangers, typos, and
+// accidentally editing the wrong match; not a defense against a
+// motivated attacker.
 
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -39,6 +47,18 @@ service cloud.firestore {
       return level() == 'admin';
     }
 
+    // Which roster player this browser picked on the "Who are you?"
+    // screen (see auth.js) -- null if never set (e.g. an admin-only
+    // browser that unlocked with the admin code instead). Used so a
+    // score-level visitor can only edit a match they're actually
+    // playing in, not any match in the round.
+    function myPlayerId() {
+      return request.auth != null
+        && exists(/databases/$(database)/documents/unlocks/$(request.auth.uid))
+        ? get(/databases/$(database)/documents/unlocks/$(request.auth.uid)).data.playerId
+        : null;
+    }
+
     // The real secret codes. Never directly readable or writable by any
     // client — only touched via get() inside this file, and only ever
     // set/edited by hand in the Firebase console.
@@ -47,22 +67,32 @@ service cloud.firestore {
     }
 
     // Each browser's own unlock attempt/result. A client can create or
-    // overwrite ONLY its own uid's doc, and only by supplying a code
-    // that matches the corresponding secret — checked server-side via
-    // get() above, so the real code is never sent back to the browser.
+    // overwrite ONLY its own uid's doc. For 'score' there's no secret
+    // to check -- picking a real player ID off the roster IS the
+    // unlock, by design (see auth.js's "Who are you?" picker); the
+    // actual gate for score entry is the per-match playerId check
+    // below, not this doc. For 'admin' it's still meant to require a
+    // code matching the real secret, checked server-side via get()
+    // above so the real code is never sent back to the browser --
+    //
+    // TEMPORARY, PRE-TRIP ONLY: that admin code-matching check is
+    // disabled below -- any code unlocks 'admin' too -- while Stephen
+    // is the only one using the app and testing freely. Restore the
+    // two commented-out lines (and delete the line that replaces them)
+    // before the trip, once other people start using the real code.
     match /unlocks/{uid} {
       allow read: if request.auth != null && request.auth.uid == uid;
 
       allow create, update: if request.auth != null
         && request.auth.uid == uid
-        && request.resource.data.level in ['score', 'admin']
-        && (
-          (request.resource.data.level == 'score'
-            && request.resource.data.code == get(/databases/$(database)/documents/secrets/config).data.scoreCode)
-          ||
-          (request.resource.data.level == 'admin'
-            && request.resource.data.code == get(/databases/$(database)/documents/secrets/config).data.adminCode)
-        );
+        && request.resource.data.level in ['score', 'admin'];
+        // && (
+        //   (request.resource.data.level == 'score'
+        //     && request.resource.data.code == get(/databases/$(database)/documents/secrets/config).data.scoreCode)
+        //   ||
+        //   (request.resource.data.level == 'admin'
+        //     && request.resource.data.code == get(/databases/$(database)/documents/secrets/config).data.adminCode)
+        // );
 
       allow delete: if false;
     }
@@ -81,10 +111,12 @@ service cloud.firestore {
       allow read: if true;
       allow write: if false;
 
-      // Individual matches within a round. The score code can update
-      // hole-by-hole results, but can ONLY touch the `holes` field —
-      // it can't reassign which players are in the match. Setting up
-      // or deleting a match (the pairings) requires the admin code.
+      // Individual matches within a round. A score-level visitor can
+      // update hole-by-hole results, but ONLY for a match they're
+      // actually playing in (their picked player ID is in that match's
+      // sideA or sideB) — and ONLY the `holes` field, never who's in
+      // the match. Setting up or deleting a match (the pairings)
+      // requires the admin code, which can edit any match.
       match /matches/{matchId} {
         allow read: if true;
 
@@ -92,7 +124,8 @@ service cloud.firestore {
 
         allow update: if isAdmin()
           || (level() == 'score'
-              && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['holes']));
+              && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['holes'])
+              && (myPlayerId() in resource.data.sideA || myPlayerId() in resource.data.sideB));
       }
     }
   }

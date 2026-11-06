@@ -9,11 +9,13 @@
 //      match document.
 //   2. A hole-by-hole scorecard per match, open to anyone with the
 //      score code: enter strokes, and the match-play status (front 9 /
-//      back 9 / overall, and points earned so far) is computed live
-//      from those strokes via scoring.js -- never stored separately.
+//      back 9 / overall) is computed live from those strokes via
+//      scoring.js -- never stored separately. The detailed hole-by-hole
+//      colors, points, and projections live on the Scoreboard page
+//      instead -- this page is just for entering strokes.
 
 import { db } from "./firebase-init.js";
-import { renderUnlockBar, getUnlockLevel } from "./auth.js";
+import { renderUnlockBar, getUnlockLevel, getUnlockPlayerId } from "./auth.js";
 import {
   collection,
   doc,
@@ -23,7 +25,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/11.3.1/firebase-firestore.js";
 import { ROUNDS, pointsAvailable } from "./rounds-config.js";
 import { COURSES } from "./courses-config.js";
-import { scoreMatch, sumMatchPoints, holeWinner, strokeSidesForHole } from "./scoring.js";
+import { scoreMatch, sumMatchPoints, holeWinner } from "./scoring.js";
 import { playerLink } from "./player-stats.js";
 
 const app = document.getElementById("app");
@@ -60,6 +62,22 @@ app.innerHTML = `
 // firestore.rules) -- score-only visitors never see the setup section.
 let isScoreUnlocked = false;
 let isAdminUnlocked = false;
+
+// Which roster player picked themselves on the "Who are you?" screen
+// -- null until someone's unlocked at the score level (or if they're
+// on an admin-only browser that never picked a player). Used below to
+// decide which specific matches THIS browser can enter scores for.
+let currentPlayerId = null;
+
+// Admin can edit any match; a plain score-level visitor can only edit
+// a match they're actually playing in. The real gate is server-side
+// in firestore.rules (this is only so the inputs/Save button look
+// locked instead of silently failing on Save).
+function canEditMatch(sideA, sideB) {
+  if (!isScoreUnlocked) return false;
+  if (isAdminUnlocked) return true;
+  return sideA.includes(currentPlayerId) || sideB.includes(currentPlayerId);
+}
 
 // Live data, kept current by the two onSnapshot listeners below.
 let players = [];
@@ -331,7 +349,7 @@ function strokeBadge(count) {
 // share one combined number per side ("USA"/"EUR"); round 3 (best
 // ball) needs one input per player, labeled with their actual name,
 // since each player plays their own ball.
-function renderHoleInputs(matchId, data, currentHole, sideA, sideB) {
+function renderHoleInputs(matchId, data, currentHole, sideA, sideB, canEdit) {
   if (round.holeShape !== "perPlayer") {
     const aVal = holeInputValue(data, currentHole, "a");
     const bVal = holeInputValue(data, currentHole, "b");
@@ -342,11 +360,11 @@ function renderHoleInputs(matchId, data, currentHole, sideA, sideB) {
     return `
       <label>USA${aBadge}
         <input type="number" min="1" max="15" inputmode="numeric" class="hole-score-input"
-               data-match-id="${matchId}" data-side="a" value="${aVal}" ${isScoreUnlocked ? "" : "disabled"} />
+               data-match-id="${matchId}" data-side="a" value="${aVal}" ${canEdit ? "" : "disabled"} />
       </label>
       <label>EUR${bBadge}
         <input type="number" min="1" max="15" inputmode="numeric" class="hole-score-input"
-               data-match-id="${matchId}" data-side="b" value="${bVal}" ${isScoreUnlocked ? "" : "disabled"} />
+               data-match-id="${matchId}" data-side="b" value="${bVal}" ${canEdit ? "" : "disabled"} />
       </label>
     `;
   }
@@ -360,7 +378,7 @@ function renderHoleInputs(matchId, data, currentHole, sideA, sideB) {
           <label>${playerLink(pid, playerName(pid))}${badge}
             <input type="number" min="1" max="15" inputmode="numeric" class="hole-score-input"
                    data-match-id="${matchId}" data-side="${side}" data-player-index="${i}"
-                   value="${val}" ${isScoreUnlocked ? "" : "disabled"} />
+                   value="${val}" ${canEdit ? "" : "disabled"} />
           </label>
         `;
       })
@@ -370,19 +388,6 @@ function renderHoleInputs(matchId, data, currentHole, sideA, sideB) {
     <span class="hole-entry-side">USA: ${sideInputs("a", sideA)}</span>
     <span class="hole-entry-side">EUR: ${sideInputs("b", sideB)}</span>
   `;
-}
-
-// Same box-coloring convention as the scoreboard page (blue/red/grey/
-// empty) -- reusing it here means the hole navigator doubles as a
-// mini momentum view for just this match, not just a hole picker.
-// `data` carries sideA/sideB/strokesGiven so this reflects NET results
-// once strokes given are in play, not just gross strokes.
-function holeBoxClass(hole, holeNum, data) {
-  const winner = holeWinner(hole, holeNum, data);
-  if (winner === "a") return "hole-usa";
-  if (winner === "b") return "hole-eur";
-  if (winner === "halved") return "hole-halved";
-  return "hole-empty";
 }
 
 // Which hole's entry panel to show for a match by default: the first
@@ -397,16 +402,6 @@ function currentHoleFor(matchId, data) {
     currentHoleByMatch[matchId] = firstOpen ? firstOpen.hole : 18;
   }
   return currentHoleByMatch[matchId];
-}
-
-// Extra class for the small corner dot marking "someone gets a stroke
-// here," independent of the box's own win/loss/halve color.
-function strokeDotClass(data, holeNum) {
-  const { a, b } = strokeSidesForHole(data, holeNum);
-  if (a && b) return " stroke-dot-both";
-  if (a) return " stroke-dot-a";
-  if (b) return " stroke-dot-b";
-  return "";
 }
 
 function renderMatchCard(matchId) {
@@ -425,32 +420,26 @@ function renderMatchCard(matchId) {
 
   const aNames = namesLinked(sideA) || "TBD";
   const bNames = namesLinked(sideB) || "TBD";
-  const holes = data.holes || {};
   const scored = scoreMatch(data);
-
-  // Projected points only mean anything once at least one hole is in
-  // -- before that every segment reads as a meaningless 0.5/0.5 halve.
-  const holesEntered = scored.front.holesEntered + scored.back.holesEntered;
-  const projectedLine =
-    holesEntered > 0
-      ? ` <span class="status-msg">(projected if it held: USA ${scored.projected.a}, EUR ${scored.projected.b})</span>`
-      : "";
 
   const currentHole = currentHoleFor(matchId, data);
   const holeInfo = course.holes[currentHole - 1];
+  const canEdit = canEditMatch(sideA, sideB);
 
-  let navNumbers = "";
-  let navBoxes = "";
-  for (let h = 1; h <= 18; h++) {
-    const selected = h === currentHole ? " selected" : "";
-    navNumbers += `<div class="hole-num">${h}</div>`;
-    navBoxes += `<button type="button" class="hole-nav-btn ${holeBoxClass(holes[String(h)], h, data)}${selected}${strokeDotClass(data, h)}"
-                   data-match-id="${matchId}" data-goto-hole="${h}" aria-label="Hole ${h}"></button>`;
-    if (h === 9) {
-      navNumbers += `<div class="hole-gap"></div>`;
-      navBoxes += `<div class="hole-gap"></div>`;
-    }
-  }
+  // Shown instead of a silent disabled state so it's obvious WHY entry
+  // is locked here but not on another match -- only once someone's
+  // actually unlocked (score or admin), never for a totally locked page.
+  const lockedNote =
+    isScoreUnlocked && !canEdit
+      ? `<p class="status-msg">Only ${aNames} or ${bNames} can enter scores for this match.</p>`
+      : "";
+
+  // Lets the scorer jump straight to any hole instead of only stepping
+  // one at a time with Prev/Next -- handy for going back to fix an
+  // earlier hole without clicking through everything in between.
+  const holeOptions = Array.from({ length: 18 }, (_, i) => i + 1)
+    .map((h) => `<option value="${h}" ${h === currentHole ? "selected" : ""}>Hole ${h}</option>`)
+    .join("");
 
   return `
     <div class="match-card">
@@ -458,20 +447,18 @@ function renderMatchCard(matchId) {
       <p>
         Front 9: <strong>${statusLabel(scored.front)}</strong> ·
         Back 9: <strong>${statusLabel(scored.back)}</strong> ·
-        Overall: <strong>${statusLabel(scored.overall)}</strong><br>
-        Points so far — USA ${scored.points.a}, EUR ${scored.points.b}${projectedLine}
+        Overall: <strong>${statusLabel(scored.overall)}</strong>
       </p>
-
-      <div class="hole-strip-numbers">${navNumbers}</div>
-      <div class="hole-strip">${navBoxes}</div>
+      ${lockedNote}
 
       <div class="hole-entry">
         <button type="button" class="secondary prev-hole" data-match-id="${matchId}" ${currentHole <= 1 ? "disabled" : ""}>◀ Prev</button>
-        <strong>Hole ${currentHole}</strong> — Par ${holeInfo.par}, Stroke Index ${holeInfo.strokeIndex}
+        <select class="hole-select" data-match-id="${matchId}" aria-label="Jump to hole">${holeOptions}</select>
+        — Par ${holeInfo.par}, Stroke Index ${holeInfo.strokeIndex}
         <button type="button" class="secondary next-hole" data-match-id="${matchId}" ${currentHole >= 18 ? "disabled" : ""}>Next ▶</button>
         <div>
-          ${renderHoleInputs(matchId, data, currentHole, sideA, sideB)}
-          <button type="button" class="save-hole" data-match-id="${matchId}" ${isScoreUnlocked ? "" : "disabled"}>Save</button>
+          ${renderHoleInputs(matchId, data, currentHole, sideA, sideB, canEdit)}
+          <button type="button" class="save-hole" data-match-id="${matchId}" ${canEdit ? "" : "disabled"}>Save</button>
           <span class="status-msg" data-save-status="${matchId}-hole"></span>
         </div>
       </div>
@@ -500,9 +487,9 @@ function renderMatches() {
 
   document.getElementById("matches").innerHTML = matchIds().map(renderMatchCard).join("");
 
-  document.querySelectorAll(".hole-nav-btn").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      goToHole(btn.dataset.matchId, parseInt(btn.dataset.gotoHole, 10));
+  document.querySelectorAll(".hole-select").forEach((select) => {
+    select.addEventListener("change", () => {
+      goToHole(select.dataset.matchId, parseInt(select.value, 10));
     });
   });
 
@@ -592,5 +579,6 @@ onSnapshot(collection(db, "rounds", roundId, "matches"), (snapshot) => {
 renderUnlockBar(document.getElementById("unlock"), "score", () => {
   isScoreUnlocked = true;
   isAdminUnlocked = getUnlockLevel() === "admin";
+  currentPlayerId = getUnlockPlayerId();
   render();
 });
