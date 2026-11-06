@@ -67,32 +67,23 @@ service cloud.firestore {
     }
 
     // Each browser's own unlock attempt/result. A client can create or
-    // overwrite ONLY its own uid's doc. For 'score' there's no secret
-    // to check -- picking a real player ID off the roster IS the
-    // unlock, by design (see auth.js's "Who are you?" picker); the
-    // actual gate for score entry is the per-match playerId check
-    // below, not this doc. For 'admin' it's still meant to require a
-    // code matching the real secret, checked server-side via get()
-    // above so the real code is never sent back to the browser --
-    //
-    // TEMPORARY, PRE-TRIP ONLY: that admin code-matching check is
-    // disabled below -- any code unlocks 'admin' too -- while Stephen
-    // is the only one using the app and testing freely. Restore the
-    // two commented-out lines (and delete the line that replaces them)
-    // before the trip, once other people start using the real code.
+    // overwrite ONLY its own uid's doc. 'score' has no secret to check
+    // -- picking a real player ID off the roster IS the unlock, by
+    // design, honor-system (see auth.js's "Who are you?" picker); the
+    // real gate for score entry is the per-match playerId check below,
+    // not this doc. 'admin' DOES require a code matching the real
+    // secret, checked server-side via get() above so the real code is
+    // never sent back to the browser.
     match /unlocks/{uid} {
       allow read: if request.auth != null && request.auth.uid == uid;
 
       allow create, update: if request.auth != null
         && request.auth.uid == uid
-        && request.resource.data.level in ['score', 'admin'];
-        // && (
-        //   (request.resource.data.level == 'score'
-        //     && request.resource.data.code == get(/databases/$(database)/documents/secrets/config).data.scoreCode)
-        //   ||
-        //   (request.resource.data.level == 'admin'
-        //     && request.resource.data.code == get(/databases/$(database)/documents/secrets/config).data.adminCode)
-        // );
+        && (
+          request.resource.data.level == 'score'
+          || (request.resource.data.level == 'admin'
+              && request.resource.data.code == get(/databases/$(database)/documents/secrets/config).data.adminCode)
+        );
 
       allow delete: if false;
     }
