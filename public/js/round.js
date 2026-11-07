@@ -25,6 +25,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/11.3.1/firebase-firestore.js";
 import { ROUNDS, pointsAvailable } from "./rounds-config.js";
 import { COURSES } from "./courses-config.js";
+import { HOLE_TIPS } from "./hole-tips-config.js";
 import { scoreMatch, sumMatchPoints, holeWinner } from "./scoring.js";
 import { playerLink } from "./player-stats.js";
 
@@ -424,6 +425,7 @@ function renderMatchCard(matchId) {
 
   const currentHole = currentHoleFor(matchId, data);
   const holeInfo = course.holes[currentHole - 1];
+  const holeTip = HOLE_TIPS[roundId][currentHole - 1];
   const canEdit = canEditMatch(sideA, sideB);
 
   // Shown instead of a silent disabled state so it's obvious WHY entry
@@ -454,6 +456,14 @@ function renderMatchCard(matchId) {
       <div class="hole-entry">
         <button type="button" class="secondary prev-hole" data-match-id="${matchId}" ${currentHole <= 1 ? "disabled" : ""}>◀ Prev</button>
         <select class="hole-select" data-match-id="${matchId}" aria-label="Jump to hole">${holeOptions}</select>
+        <!-- "Hole N" links out to Kohler's yardage PDF for this hole,
+             "(how to play)" links to their hole-description page.
+             rel="noopener" is standard practice for target="_blank"
+             links: without it, the page we open gets a handle back to
+             this tab via window.opener and could redirect it -- a
+             known phishing trick called "tabnabbing". -->
+        <a href="${holeTip.yardageUrl}" target="_blank" rel="noopener">Hole ${currentHole}</a>
+        (<a href="${holeTip.tipUrl}" target="_blank" rel="noopener">how to play</a>)
         — Par ${holeInfo.par}, Stroke Index ${holeInfo.strokeIndex}
         <button type="button" class="secondary next-hole" data-match-id="${matchId}" ${currentHole >= 18 ? "disabled" : ""}>Next ▶</button>
         <div>
