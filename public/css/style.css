@@ -109,8 +109,10 @@ body {
      env(safe-area-inset-*) is the height of the iPhone's notch/home bar
      area (0 on other devices). It only reports a real value because the
      viewport tag says viewport-fit=cover. */
+  /* Top padding also adds the safe area, so content clears the
+     iPhone status bar when the site is opened from the home screen. */
   padding:
-    var(--space-4)
+    calc(var(--space-4) + env(safe-area-inset-top))
     max(var(--space-4), env(safe-area-inset-right))
     calc(var(--tabbar-height) + env(safe-area-inset-bottom) + var(--space-6))
     max(var(--space-4), env(safe-area-inset-left));
@@ -708,4 +710,442 @@ li {
 .tab-popover a.is-active {
   background: var(--bg);
   box-shadow: inset 3px 0 0 var(--navy);   /* thin left bar, no layout shift */
+}
+
+/* ==================================================================
+   5. HOME PAGE  (index.html; numbers filled in by js/index.js)
+   ================================================================== */
+
+/* --- Navy header band ---
+   The page content lives in a <body> column at most 900px wide with
+   16px side padding, but this band should run edge to edge. Trick:
+   a huge box-shadow with no blur (100vmax = the longer screen side)
+   paints navy far beyond the element in every direction, and
+   clip-path then cuts that off above and below, keeping only the
+   sideways part. Unlike width: 100vw, this paints outside the element
+   without making it wider, so it can't cause sideways scrolling.
+   The negative top margin cancels the body's top padding so the navy
+   touches the top of the screen. */
+.home-header {
+  background: var(--navy);
+  box-shadow: 0 0 0 100vmax var(--navy);
+  clip-path: inset(0 -100vmax);
+  margin-top: calc(-1 * (var(--space-4) + env(safe-area-inset-top)));
+  padding-top: calc(var(--space-5) + env(safe-area-inset-top));
+  /* Extra room at the bottom, because the score panels below are
+     pulled up to overlap this band (see .score-banner). */
+  padding-bottom: 56px;
+  text-align: center;
+}
+
+/* The page's <h1>, styled as a small spaced-out label ("eyebrow"),
+   since the score banner is the real visual headline. */
+.home-eyebrow {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  color: #fff;
+}
+
+.home-location {
+  margin: var(--space-1) 0 0;
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.72);
+}
+
+/* Keeps a phrase on one line; the line can still break between phrases. */
+.nowrap {
+  white-space: nowrap;
+}
+
+/* --- Score banner ---
+   Pulled 40px up into the navy band, the overlap look of TV scoring
+   graphics. position: relative keeps it drawn on top of the header. */
+.score-banner {
+  position: relative;
+  margin-top: -40px;
+}
+
+/* Two equal columns (1fr = one share of the free space each). */
+.team-panels {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-2);
+}
+
+.team-panel {
+  border-radius: var(--radius-card);
+  padding: var(--space-3) var(--space-2) var(--space-4);
+  text-align: center;
+  color: #fff;
+  box-shadow: 0 4px 14px rgba(11, 31, 58, 0.25);
+}
+
+/* A slight diagonal fade from the team color to its darker shade. */
+.team-panel-usa {
+  background: linear-gradient(160deg, var(--usa) 0%, var(--usa-dark) 100%);
+}
+
+.team-panel-eu {
+  background: linear-gradient(160deg, var(--eu) 0%, var(--eu-dark) 100%);
+}
+
+.team-panel-name {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+/* The huge numerals. clamp(min, preferred, max) picks a size that
+   scales with screen width (22vw = 22% of the screen width) but never
+   goes below 4rem or above 6rem. tabular-nums gives every digit the
+   same width, so the number doesn't jiggle when it changes. */
+.team-panel-score {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: clamp(4rem, 22vw, 6rem);
+  line-height: 0.95;
+  font-variant-numeric: tabular-nums;
+  margin: var(--space-1) 0;
+}
+
+.team-panel-target {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.9rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.85;
+}
+
+/* --- Tug-of-war bar ---
+   A grey track. Red fills from the left edge and blue from the right,
+   each width set by index.js as a share of ALL points, so the grey
+   left in the middle is points still to play. Crossing the center
+   tick (half the points) is the winning line. */
+.tug-bar {
+  position: relative;
+  height: 10px;
+  margin-top: var(--space-3);
+  background: var(--empty);
+  border-radius: var(--radius-pill);
+}
+
+.tug-fill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 0;   /* starts empty; index.js sets the real width */
+  /* Animates any width change over half a second. */
+  transition: width 0.5s ease;
+}
+
+.tug-fill-usa {
+  left: 0;
+  background: var(--usa);
+  border-radius: var(--radius-pill) 0 0 var(--radius-pill);
+}
+
+.tug-fill-eu {
+  right: 0;
+  background: var(--eu);
+  border-radius: 0 var(--radius-pill) var(--radius-pill) 0;
+}
+
+/* The halfway mark: a short navy line, a bit taller than the bar.
+   left: 50% puts its LEFT edge at the middle; translateX(-50%) then
+   shifts it back by half its own width so it's truly centered. */
+.tug-tick {
+  position: absolute;
+  left: 50%;
+  top: -4px;
+  bottom: -4px;
+  width: 2px;
+  transform: translateX(-50%);
+  background: var(--navy);
+  border-radius: 1px;
+}
+
+/* --- Projected row --- */
+.projected-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+.projected-label {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.9rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.projected-score {
+  font-size: 0.95rem;
+}
+
+.projected-score strong {
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+}
+
+/* USA's projected number red, EU's blue (team colors on a score). */
+#projected-a {
+  color: var(--usa);
+}
+
+#projected-b {
+  color: var(--eu);
+}
+
+/* The ⓘ button: a small symbol with a full 44x44 tap area, with the
+   navy button look from the base styles removed. */
+.info-btn {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0;
+  margin: 0 -10px;   /* the 44px tap area overlaps the gap so the ⓘ sits close to the text */
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-size: 1.15rem;
+  font-weight: 400;
+}
+
+.info-btn:hover,
+.info-btn[aria-expanded="true"] {
+  background: transparent;
+  color: var(--navy);
+}
+
+.projected-note {
+  max-width: 34em;
+  margin: 0 auto var(--space-2);
+  font-size: 0.85rem;
+  color: var(--muted);
+  text-align: center;
+}
+
+/* --- Matches-complete chip --- */
+.chip-row {
+  text-align: center;
+  margin-top: var(--space-1);
+}
+
+.chip {
+  display: inline-block;
+  padding: 6px 14px;
+  border-radius: var(--radius-pill);
+  background: var(--card);
+  border: 1px solid var(--border);
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.chip strong {
+  color: var(--text);
+}
+
+/* --- "How we got here" round cards --- */
+.section-title {
+  margin-top: var(--space-6);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+/* A grid with a 12px gap is the simplest way to space a stack of cards. */
+.round-cards {
+  display: grid;
+  gap: var(--space-3);
+}
+
+/* Each card is one big link (<a>) to its round page, so the whole
+   card is tappable. Link underline/color reset so it reads as a card. */
+.round-card {
+  display: block;
+  padding: var(--space-3) var(--space-4);
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  color: var(--text);
+  text-decoration: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.round-card:hover {
+  color: var(--text);
+  border-color: var(--halved);
+}
+
+/* The Total card gets a navy outline so it reads as the summary. */
+.round-card-total {
+  border: 2px solid var(--navy);
+}
+
+/* Title block on the left, points available on the right. */
+.round-card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+.round-card-title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.15rem;
+  line-height: 1.1;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--navy);
+}
+
+.round-card-subtitle {
+  margin-top: 2px;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.round-card-available {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.4rem;
+  line-height: 1;
+  color: var(--navy);
+  white-space: nowrap;
+}
+
+.round-card-available span {
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* USA points | mini bar | EU points, in one row. */
+.mini-score {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+}
+
+.mini-score-usa,
+.mini-score-eu {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.35rem;
+  line-height: 1;
+  min-width: 2.2em;   /* keeps the bar the same length whether a score is "0" or "10½" */
+  font-variant-numeric: tabular-nums;
+}
+
+.mini-score-usa {
+  color: var(--usa);
+}
+
+.mini-score-eu {
+  color: var(--eu);
+  text-align: right;
+}
+
+/* Same idea as the big tug bar, smaller. overflow: hidden clips the
+   fills to the track's rounded ends. */
+.mini-bar {
+  flex: 1;
+  position: relative;
+  height: 8px;
+  background: var(--empty);
+  border-radius: var(--radius-pill);
+  overflow: hidden;
+}
+
+.mini-fill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+}
+
+.mini-fill-usa {
+  left: 0;
+  background: var(--usa);
+}
+
+.mini-fill-eu {
+  right: 0;
+  background: var(--eu);
+}
+
+.round-card-projected {
+  margin-top: var(--space-1);
+  font-size: 0.8rem;
+  color: var(--muted);
+  text-align: center;
+}
+
+/* --- "How scoring works" (a <details> element) ---
+   <summary> is the always-visible line you tap; the rest shows only
+   when open. The browser's default triangle is hidden and replaced
+   with a "+" that becomes "–" when open. */
+.scoring-details {
+  margin-top: var(--space-5);
+  padding: 0 var(--space-4);
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+}
+
+.scoring-details summary {
+  display: flex;
+  align-items: center;
+  min-height: 48px;
+  cursor: pointer;
+  list-style: none;   /* hides the default triangle (Firefox/Chrome) */
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 1.05rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--navy);
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Hides the default triangle in Safari, which uses its own marker. */
+.scoring-details summary::-webkit-details-marker {
+  display: none;
+}
+
+.scoring-details summary::after {
+  content: "+";
+  margin-left: auto;   /* pushes the symbol to the far right */
+  font-size: 1.4rem;
+  line-height: 1;
+}
+
+.scoring-details[open] summary::after {
+  content: "–";
+}
+
+.scoring-details p {
+  margin: 0 0 var(--space-4);
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+/* People who turn on "Reduce motion" in their phone settings get the
+   bars jumping straight to their new size instead of sliding. */
+@media (prefers-reduced-motion: reduce) {
+  .tug-fill {
+    transition: none;
+  }
 }

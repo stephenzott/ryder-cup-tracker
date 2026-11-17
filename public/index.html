@@ -8,48 +8,80 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Inter:wght@400;500;600&display=swap" />
   <title>2027 Ryder Cup Trip — Live Standings</title>
-  <link rel="stylesheet" href="css/style.css?v=2" />
+  <link rel="stylesheet" href="css/style.css?v=3" />
 </head>
 <body>
+  <!-- Every number below starts at a sensible default (0, "30½", "0 of
+       20") so the page looks complete the moment it opens. js/index.js
+       overwrites them as soon as it loads, and again every time a
+       score changes. The ids are what index.js looks up. -->
 
-  <h1>2027 Ryder Cup Trip — Live Standings</h1>
-  <p><strong>Sheboygan, WI — Whistling Straits &amp; Blackwolf Run</strong></p>
-  <p id="intro-blurb">Loading…</p>
+  <!-- 1. Navy header band (edge to edge; see .home-header in style.css). -->
+  <header class="home-header">
+    <h1 class="home-eyebrow">2027 Ryder Cup Trip</h1>
+    <!-- Each half is kept on one line (.nowrap), so on a narrow phone
+         the line breaks at the "·" instead of stranding "WI". -->
+    <p class="home-location"><span class="nowrap">Whistling Straits &amp; Blackwolf Run</span> · <span class="nowrap">Sheboygan, WI</span></p>
+  </header>
 
-  <table>
-    <thead>
-      <tr><th></th><th>Points</th></tr>
-    </thead>
-    <tbody>
-      <tr><td><strong>United States</strong></td><td id="score-a">—</td></tr>
-      <tr><td><strong>Europe</strong></td><td id="score-b">—</td></tr>
-    </tbody>
-  </table>
+  <!-- 2. Score banner: two team panels, then the tug-of-war bar. -->
+  <section class="score-banner" aria-label="Current score">
+    <div class="team-panels">
+      <div class="team-panel team-panel-usa">
+        <div class="team-panel-name">Team USA</div>
+        <div class="team-panel-score" id="score-a">0</div>
+        <div class="team-panel-target"><span class="to-win">30½</span> to win</div>
+      </div>
+      <div class="team-panel team-panel-eu">
+        <div class="team-panel-name">Team EU</div>
+        <div class="team-panel-score" id="score-b">0</div>
+        <div class="team-panel-target"><span class="to-win">30½</span> to win</div>
+      </div>
+    </div>
 
-  <p>
-    <strong>Projected:</strong> United States <span id="projected-a">—</span> –
-    Europe <span id="projected-b">—</span>
-    <br>
-    <em>Counts in-progress segments (front 9 / back 9 / overall) as if they ended right now — not official until a segment is actually complete.</em>
+    <!-- Tug-of-war bar. Purely visual (aria-hidden): screen readers
+         already get the numbers from the panels above. index.js sets the
+         two fills' widths as percentages of all points available. -->
+    <div class="tug-bar" aria-hidden="true">
+      <div class="tug-fill tug-fill-usa" id="tug-usa"></div>
+      <div class="tug-fill tug-fill-eu" id="tug-eu"></div>
+      <div class="tug-tick"></div>
+    </div>
+  </section>
+
+  <!-- 3. Projected row, with an ⓘ button that shows/hides the note. -->
+  <div class="projected-row">
+    <span class="projected-label">Projected</span>
+    <span class="projected-score">
+      USA <strong id="projected-a">0</strong> – <strong id="projected-b">0</strong> EU
+    </span>
+    <!-- aria-expanded tells screen readers whether the note is open;
+         aria-controls says which element this button opens. -->
+    <button type="button" class="info-btn" id="projected-info-btn"
+            aria-expanded="false" aria-controls="projected-note"
+            aria-label="What does projected mean?">ⓘ</button>
+  </div>
+  <p class="projected-note" id="projected-note" hidden>
+    Counts in-progress segments (front 9 / back 9 / overall) as if they ended right now — not official until a segment is actually complete.
   </p>
 
-  <h2>How we got here</h2>
-  <table>
-    <thead>
-      <tr>
-        <th>Round</th>
-        <th>Points available</th>
-        <th>United States</th>
-        <th>Europe</th>
-        <th>Projected</th>
-      </tr>
-    </thead>
-    <tbody id="rounds-rows">
-      <tr><td colspan="5">Loading…</td></tr>
-    </tbody>
-  </table>
+  <!-- 4. Matches-complete chip. -->
+  <div class="chip-row">
+    <span class="chip">Matches complete: <strong id="matches-complete">0 of 20</strong></span>
+  </div>
 
-  <p>See <a href="schedule.html">Schedule</a> for course/tee/format details, <a href="roster.html">Roster</a> for the full field and handicaps, and the round pages for match-by-match results.</p>
+  <!-- 5. One card per round, plus a Total card. Built by index.js. -->
+  <section aria-labelledby="how-heading">
+    <h2 id="how-heading" class="section-title">How we got here</h2>
+    <div class="round-cards" id="round-cards"></div>
+  </section>
+
+  <!-- 6. Collapsible explainer. <details>/<summary> is a built-in HTML
+       element that opens and closes on tap with no JavaScript. -->
+  <details class="scoring-details">
+    <summary>How scoring works</summary>
+    <p id="intro-blurb"></p>
+  </details>
 
   <script type="module" src="js/nav.js?v=2"></script>
   <script type="module" src="js/index.js"></script>
