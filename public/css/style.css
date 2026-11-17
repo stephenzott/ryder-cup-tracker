@@ -474,8 +474,14 @@ li {
   gap: var(--space-2);
 }
 
+/* The small score boxes are only 3.5rem (56px) wide, and with
+   border-box sizing that width includes padding. The usual 12px side
+   padding would leave about 30px for the digits, which is too tight
+   for "12" plus desktop spinner arrows. 4px sides leave about 46px. */
 .hole-entry input[type="number"] {
   width: 3.5rem;
+  padding-left: var(--space-1);
+  padding-right: var(--space-1);
   text-align: center;
 }
 
@@ -493,8 +499,11 @@ li {
   margin: var(--space-3) 0;
 }
 
+/* Same narrow-box padding fix as the score inputs below. */
 .strokes-count-input {
   width: 3.5rem;
+  padding-left: var(--space-1);
+  padding-right: var(--space-1);
   text-align: center;
 }
 
