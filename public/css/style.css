@@ -1766,8 +1766,11 @@ strong.flash-eu {
    "Your match" bar, the score-entry panel, steppers and admin setup.
    ================================================================== */
 
-/* --- Navy header band (edge to edge, same trick as the home header) --- */
-.rd-header {
+/* --- Navy header band (edge to edge, same trick as the home header) ---
+   .page-header is the same band for the roster, stats and player pages
+   (their own extras are in section 9). */
+.rd-header,
+.page-header {
   background: var(--navy);
   box-shadow: 0 0 0 100vmax var(--navy);
   clip-path: inset(0 -100vmax);
@@ -1776,7 +1779,8 @@ strong.flash-eu {
   color: var(--on-navy);
 }
 
-.rd-eyebrow {
+.rd-eyebrow,
+.page-eyebrow {
   margin: 0;
   font-family: var(--font-display);
   font-weight: 700;
@@ -1786,12 +1790,14 @@ strong.flash-eu {
   color: var(--on-navy-muted);
 }
 
-.rd-title {
+.rd-title,
+.page-title {
   margin: var(--space-1) 0 0;
   color: var(--on-navy);
 }
 
-.rd-course {
+.rd-course,
+.page-sub {
   margin: var(--space-1) 0 0;
   font-size: 0.95rem;
   color: var(--on-navy);
@@ -2398,4 +2404,418 @@ strong.flash-eu {
   background: var(--navy);
   border-color: var(--navy);
   color: var(--on-navy);
+}
+
+/* ==================================================================
+   9. ROSTER, STATS AND PLAYER PAGES
+   ================================================================== */
+
+/* --- Initials circle ("avatar") ---
+   Red or blue for a player's team IN THE YEAR BEING SHOWN, or neutral
+   navy where years are mixed (teams are redrawn every year). */
+.avatar {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.8rem;
+  letter-spacing: 0.02em;
+  color: var(--on-navy);
+  vertical-align: middle;
+}
+
+.avatar-usa { background: var(--usa); }
+.avatar-eu { background: var(--eu); }
+.avatar-none { background: var(--navy); }
+
+/* The big one on the player page, which sits on the navy header, so it
+   gets a lighter navy fill and a soft white ring to stand out. */
+.avatar-lg {
+  width: 64px;
+  height: 64px;
+  font-size: 1.5rem;
+}
+
+.page-header .avatar-none {
+  background: var(--navy-hover);
+  box-shadow: 0 0 0 2px var(--on-navy-muted);
+}
+
+/* --- Team pill: "2027 · Team USA" --- */
+.team-pill {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: var(--radius-pill);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.85rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.team-pill-usa { background: var(--usa); color: var(--on-navy); }
+.team-pill-eu { background: var(--eu); color: var(--on-navy); }
+.team-pill-none { background: var(--empty); color: var(--text); }
+
+/* --- Extra skeleton shapes --- */
+.skeleton-avatar {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+}
+
+.skeleton-avatar-lg {
+  flex: none;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: var(--navy-hover);
+}
+
+.skeleton-name {
+  width: 40%;
+  margin-top: 0;
+}
+
+/* --- Roster --- */
+.roster-group {
+  margin-top: var(--space-5);
+}
+
+/* Group heading: team pill on the left, player count on the right. */
+.roster-group-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-2);
+  font-size: 1rem;
+}
+
+.roster-count {
+  font-family: var(--font-body);
+  font-weight: 400;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+/* One white card holding the group's rows. */
+.roster-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+}
+
+/* A row: [circle] [name ............] [HCP 12.4]. Three grid columns:
+   28px, "the rest", and "as wide as needed". Admin controls take a
+   second line spanning all three columns. */
+.roster-row {
+  display: grid;
+  grid-template-columns: 28px 1fr auto;
+  align-items: center;
+  gap: var(--space-1) var(--space-3);
+  min-height: 52px;
+  margin: 0;
+  padding: 0 var(--space-3);
+  border-bottom: 1px solid var(--border);
+}
+
+.roster-row:last-child {
+  border-bottom: none;
+}
+
+.roster-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.roster-name a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.roster-hcp {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 1.05rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.roster-hcp-label {
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+
+.roster-row-admin {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: var(--space-2);
+  padding-bottom: var(--space-3);
+}
+
+.roster-row-admin select {
+  flex: 1;
+  min-width: 0;
+}
+
+.roster-row-empty {
+  display: block;
+  padding: var(--space-3);
+  font-style: italic;
+  color: var(--muted);
+}
+
+.roster-admin {
+  margin-top: var(--space-6);
+}
+
+.roster-add-card {
+  margin-top: var(--space-3);
+  padding: var(--space-3);
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+}
+
+/* The add-player form: one labeled field per line (overrides the
+   generic side-by-side form layout from section 2). */
+.roster-form {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.roster-field {
+  display: grid;
+  gap: var(--space-1);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.roster-field input,
+.roster-field select {
+  width: 100%;
+  font-weight: 400;
+}
+
+.roster-form .rd-actions {
+  margin-top: 0;
+}
+
+/* --- Stats --- */
+
+/* Header with tabs at its bottom edge (no bottom padding, so the tab
+   underline sits on the header's edge like the scoreboard's). */
+.page-header-tabs {
+  padding-bottom: 0;
+}
+
+.st-tabs {
+  margin-top: var(--space-3);
+}
+
+.st-note {
+  margin: var(--space-3) 0 0;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+/* The leaderboard sits in a white card. If it's ever wider than the
+   screen, the card scrolls sideways, never the page. */
+.lb-wrap {
+  margin-top: var(--space-3);
+  overflow-x: auto;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+}
+
+/* Undo the generic table look (which makes every table its own
+   scrolling block); here the wrapper above does that job, so the table
+   can be a normal full-width table. */
+table.leaderboard {
+  display: table;
+  width: 100%;
+  margin: 0;
+  background: transparent;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.leaderboard th,
+.leaderboard td {
+  padding: 0 6px;
+  height: 44px;
+}
+
+.leaderboard th {
+  height: 36px;
+}
+
+.leaderboard abbr[title] {
+  text-decoration: none;   /* the key under the table explains them */
+}
+
+.lb-rank {
+  width: 2.4em;
+  text-align: center;
+  font-family: var(--font-display);
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.lb-player {
+  white-space: nowrap;
+}
+
+.lb-name {
+  margin-left: var(--space-2);
+}
+
+/* Name links fill the row height so they're easy to tap. */
+.lb-name a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  vertical-align: middle;
+  color: var(--text);
+  font-weight: 500;
+}
+
+.lb-num {
+  text-align: right;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 1.05rem;
+  font-variant-numeric: tabular-nums;
+}
+
+th.lb-num {
+  font-size: 0.9rem;
+}
+
+.lb-pts {
+  font-weight: 700;
+  font-size: 1.2rem;
+  color: var(--navy);
+}
+
+.lb-key {
+  margin-top: var(--space-2);
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.lb-skeleton-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 44px;
+  padding: 0 var(--space-3);
+}
+
+/* --- Player page --- */
+.player-hero {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.player-hero-text {
+  min-width: 0;
+}
+
+.player-hero .page-title {
+  margin-top: 0;
+  overflow-wrap: anywhere;
+}
+
+.player-hero-pill {
+  margin-top: var(--space-3);
+}
+
+/* Stat tiles: as many ~100px-wide columns as fit (3 on a phone). */
+.stat-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+}
+
+.stat-tile {
+  padding: 10px var(--space-3);
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+}
+
+.stat-tile-label {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.stat-tile-value {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.8rem;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+  color: var(--navy);
+}
+
+.stat-tile-note {
+  font-size: 0.7rem;
+  line-height: 1.3;
+  color: var(--muted);
+}
+
+/* Round card title links to that round's page. */
+.sb-match-no a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--navy);
+}
+
+.player-match-meta {
+  margin: var(--space-1) 0 0;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.player-match-foot {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--space-1) var(--space-3);
+  margin-top: var(--space-3);
+  font-size: 0.85rem;
+}
+
+.player-match-foot strong {
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  font-variant-numeric: tabular-nums;
 }

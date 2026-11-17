@@ -182,3 +182,42 @@ export const SKELETON_CARD = `
     <div class="skeleton skeleton-grid"></div>
   </div>
 `;
+
+// ------------------------------------------------------------------
+// Players and teams (roster, stats and player pages)
+// ------------------------------------------------------------------
+
+// The trip year currently being played. Team assignments are only
+// valid for ONE year (players are redrawn onto USA / EU each trip), so
+// anywhere a team is shown it's labeled with this year. Update this
+// once when next year's trip starts.
+export const CURRENT_YEAR = 2027;
+
+// Team codes come in two spellings: "A"/"B" in Firestore's players
+// collection (this year), "usa"/"europe" in history-data.js (past
+// trips). Both map to a CSS suffix: "usa", "eu", or "none".
+export function teamKey(team) {
+  if (team === "A" || team === "usa") return "usa";
+  if (team === "B" || team === "europe") return "eu";
+  return "none";
+}
+
+export function teamName(team) {
+  const key = teamKey(team);
+  if (key === "usa") return "Team USA";
+  if (key === "eu") return "Team EU";
+  return "Unassigned";
+}
+
+// An initials circle. `team` colors it (red / blue); pass null for the
+// neutral navy version (used where several years are mixed together,
+// since a player's team changes from year to year). size "lg" = the
+// big one on the player page.
+export function avatarHtml(name, team, size = "") {
+  return `<span class="avatar avatar-${teamKey(team)}${size ? ` avatar-${size}` : ""}" aria-hidden="true">${initials(name)}</span>`;
+}
+
+// A pill like "2027 · Team USA", in that year's team color.
+export function teamPillHtml(team, year = CURRENT_YEAR) {
+  return `<span class="team-pill team-pill-${teamKey(team)}">${year} · ${teamName(team)}</span>`;
+}

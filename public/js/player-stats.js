@@ -133,12 +133,6 @@ export function formatToPar(n) {
   return n > 0 ? `+${n}` : `${n}`;
 }
 
-export function flag(team) {
-  if (team === "A") return "🇺🇸";
-  if (team === "B") return "🇪🇺";
-  return "";
-}
-
 export function firstName(fullName) {
   return fullName.split(" ")[0];
 }

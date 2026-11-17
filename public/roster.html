@@ -8,45 +8,59 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Inter:wght@400;500;600&display=swap" />
   <title>Roster — Ryder Cup Trip</title>
-  <link rel="stylesheet" href="css/style.css?v=6" />
+  <link rel="stylesheet" href="css/style.css?v=7" />
 </head>
 <body>
 
-  <h1>Roster</h1>
-  <p>Handicap Index is shown for reference only — it isn't used in match scoring yet.</p>
+  <!-- Navy page header (shared .page-header style). -->
+  <header class="page-header">
+    <p class="page-eyebrow" id="roster-eyebrow">This year's field</p>
+    <h1 class="page-title">Roster</h1>
+    <p class="page-sub">Teams are redrawn every year; these are this year's. Handicap Index is shown for reference only. It isn't used in match scoring yet.</p>
+  </header>
 
-  <table>
-    <thead>
-      <tr>
-        <th>Player</th>
-        <th>Handicap Index</th>
-        <th>Team</th>
-        <th id="roster-admin-col" style="display: none"></th>
-      </tr>
-    </thead>
-    <tbody id="roster-rows">
-      <tr><td colspan="4">Loading…</td></tr>
-    </tbody>
-  </table>
-
-  <h2>Admin</h2>
-  <p>Add, remove, or reassign players. Requires the admin code.</p>
-  <div id="unlock"></div>
-
-  <div id="admin-controls" class="locked">
-    <h3>Add player</h3>
-    <form id="add-player-form">
-      <input type="text" id="new-player-name" placeholder="Player name" required />
-      <input type="number" id="new-player-handicap" placeholder="Handicap index" step="0.1" />
-      <select id="new-player-team">
-        <option value="">Unassigned</option>
-        <option value="A">United States</option>
-        <option value="B">Europe</option>
-      </select>
-      <button type="submit">Add player</button>
-      <span class="status-msg" id="add-player-status"></span>
-    </form>
+  <!-- Players grouped by this year's team. Built by js/roster.js, which
+       replaces these grey placeholder rows once the roster loads. -->
+  <div id="roster-groups" aria-busy="true">
+    <section class="roster-group">
+      <ul class="roster-list">
+        <li class="roster-row" aria-hidden="true"><span class="skeleton skeleton-avatar"></span><span class="skeleton skeleton-line skeleton-name"></span></li>
+        <li class="roster-row" aria-hidden="true"><span class="skeleton skeleton-avatar"></span><span class="skeleton skeleton-line skeleton-name"></span></li>
+        <li class="roster-row" aria-hidden="true"><span class="skeleton skeleton-avatar"></span><span class="skeleton skeleton-line skeleton-name"></span></li>
+        <li class="roster-row" aria-hidden="true"><span class="skeleton skeleton-avatar"></span><span class="skeleton skeleton-line skeleton-name"></span></li>
+      </ul>
+    </section>
   </div>
+
+  <section class="roster-admin">
+    <h2 class="section-title">Admin</h2>
+    <p class="rd-help">Add, remove, or reassign players. Requires the admin code.</p>
+    <div id="unlock"></div>
+
+    <!-- "locked" fades this card and blocks taps until unlocked. -->
+    <div id="admin-controls" class="locked roster-add-card">
+      <h3 class="rd-setup-subtitle">Add player</h3>
+      <form id="add-player-form" class="roster-form">
+        <label class="roster-field">Name
+          <input type="text" id="new-player-name" placeholder="Player name" required />
+        </label>
+        <label class="roster-field">Handicap index
+          <input type="number" id="new-player-handicap" placeholder="e.g. 12.4" step="0.1" />
+        </label>
+        <label class="roster-field">Team (this year)
+          <select id="new-player-team">
+            <option value="">Unassigned</option>
+            <option value="A">Team USA</option>
+            <option value="B">Team EU</option>
+          </select>
+        </label>
+        <div class="rd-actions">
+          <button type="submit">Add player</button>
+          <span class="status-msg" id="add-player-status"></span>
+        </div>
+      </form>
+    </div>
+  </section>
 
   <script type="module" src="js/nav.js?v=2"></script>
   <script type="module" src="js/roster.js"></script>
