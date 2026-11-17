@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Inter:wght@400;500;600&display=swap" />
   <title>2027 Ryder Cup Trip — Live Standings</title>
-  <link rel="stylesheet" href="css/style.css?v=4" />
+  <link rel="stylesheet" href="css/style.css?v=5" />
 </head>
 <body>
   <!-- Every number below starts at a sensible default (0, "30½", "0 of
@@ -70,10 +70,19 @@
     <span class="chip">Matches complete: <strong id="matches-complete">0 of 20</strong></span>
   </div>
 
-  <!-- 5. One card per round, plus a Total card. Built by index.js. -->
+  <!-- 5. One card per round, plus a Total card. Built by index.js,
+       which replaces these grey placeholder ("skeleton") cards as soon
+       as it runs. aria-busy tells screen readers the area is still
+       loading; index.js removes it. -->
   <section aria-labelledby="how-heading">
     <h2 id="how-heading" class="section-title">How we got here</h2>
-    <div class="round-cards" id="round-cards"></div>
+    <div class="round-cards" id="round-cards" aria-busy="true">
+      <div class="skeleton-card" aria-hidden="true"><div class="skeleton skeleton-line skeleton-title"></div><div class="skeleton skeleton-line skeleton-short"></div><div class="skeleton skeleton-bar"></div></div>
+      <div class="skeleton-card" aria-hidden="true"><div class="skeleton skeleton-line skeleton-title"></div><div class="skeleton skeleton-line skeleton-short"></div><div class="skeleton skeleton-bar"></div></div>
+      <div class="skeleton-card" aria-hidden="true"><div class="skeleton skeleton-line skeleton-title"></div><div class="skeleton skeleton-line skeleton-short"></div><div class="skeleton skeleton-bar"></div></div>
+      <div class="skeleton-card" aria-hidden="true"><div class="skeleton skeleton-line skeleton-title"></div><div class="skeleton skeleton-line skeleton-short"></div><div class="skeleton skeleton-bar"></div></div>
+      <div class="skeleton-card" aria-hidden="true"><div class="skeleton skeleton-line skeleton-title"></div><div class="skeleton skeleton-line skeleton-short"></div><div class="skeleton skeleton-bar"></div></div>
+    </div>
   </section>
 
   <!-- 6. Collapsible explainer. <details>/<summary> is a built-in HTML

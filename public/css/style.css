@@ -43,10 +43,14 @@
   --bg: #F2F5F9;            /* page background */
   --card: #FFFFFF;          /* card / table surface */
   --text: #0F1B2D;          /* body text */
-  --muted: #5B6B7F;         /* secondary text */
+  --muted: #4A5869;         /* secondary text (darkened in step 4 for sunlight: 6.6:1 on --bg) */
   --border: #D9E0E8;        /* hairlines, input borders */
   --halved: #9AA5B1;        /* a halved hole */
   --empty: #E6EBF1;         /* a hole not played yet */
+
+  /* --- Text on dark/colored backgrounds --- */
+  --on-navy: #FFFFFF;                        /* text/icons on navy, red or blue */
+  --on-navy-muted: rgba(255, 255, 255, 0.66); /* dimmer text on navy (7:1 contrast) */
 
   /* --- Status message colors (not team colors). A conventional
      "saved" green and "error" red-brown, darker than the team red so
@@ -68,6 +72,10 @@
   --radius-pill: 999px;    /* any value larger than half the height gives a full pill */
   --radius-small: 4px;     /* small boxes: hole squares, inputs */
   --shadow-card: 0 1px 2px rgba(15, 27, 45, 0.06), 0 2px 8px rgba(15, 27, 45, 0.06);
+  --shadow-raised: 0 4px 14px rgba(11, 31, 58, 0.25);   /* score panels */
+  --shadow-popover: 0 8px 24px rgba(11, 31, 58, 0.22);  /* tab-bar popovers */
+  --shadow-tabbar: 0 -2px 10px rgba(11, 31, 58, 0.18);  /* top edge of the tab bar */
+  --flash-ring: rgba(11, 31, 58, 0.35);                  /* card highlight glow */
 
   /* --- Fonts. If Google Fonts fails to load, each list falls back to
      the phone's built-in fonts, left to right. --- */
@@ -201,7 +209,7 @@ button {
   padding: var(--space-2) var(--space-4);
   border: 1px solid var(--navy);
   background: var(--navy);
-  color: #fff;
+  color: var(--on-navy);
   border-radius: var(--radius-card);
   cursor: pointer;
   /* Removes the grey flash iOS draws when you tap a link or button. */
@@ -453,7 +461,7 @@ li {
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  border: 1px solid #fff;
+  border: 1px solid var(--on-navy);
 }
 
 .stroke-dot-a::after {
@@ -550,7 +558,7 @@ li {
 .hole-toggle-btn.toggled {
   background: var(--navy);
   border-color: var(--navy);
-  color: #fff;
+  color: var(--on-navy);
 }
 
 /* --- Small "Saved" / "Error" messages next to buttons --- */
@@ -585,7 +593,7 @@ li {
   padding-bottom: env(safe-area-inset-bottom);
   padding-left: env(safe-area-inset-left);
   padding-right: env(safe-area-inset-right);
-  box-shadow: 0 -2px 10px rgba(11, 31, 58, 0.18);
+  box-shadow: var(--shadow-tabbar);
 }
 
 /* Six tabs in a row, each an equal share of the width (flex: 1).
@@ -615,7 +623,7 @@ li {
   border: none;
   border-radius: 0;
   background: transparent;
-  color: rgba(255, 255, 255, 0.62);
+  color: var(--on-navy-muted);
   text-decoration: none;
   font-family: var(--font-display);
   font-weight: 600;
@@ -630,7 +638,7 @@ li {
 /* Undo the generic button:hover / :disabled styles above for tabs. */
 .tab:hover {
   background: transparent;
-  color: #fff;
+  color: var(--on-navy);
 }
 
 .tab svg {
@@ -662,7 +670,7 @@ li {
 
 /* The current page's tab: white, plus a short white bar on top. */
 .tab.is-active {
-  color: #fff;
+  color: var(--on-navy);
   position: relative;
 }
 
@@ -674,12 +682,12 @@ li {
   right: 28%;
   height: 3px;
   border-radius: 0 0 3px 3px;
-  background: #fff;
+  background: var(--on-navy);
 }
 
 /* A popover tab that's open right now. */
 .tab[aria-expanded="true"] {
-  color: #fff;
+  color: var(--on-navy);
 }
 
 /* --- Popover menus (Rounds, More) ---
@@ -696,7 +704,7 @@ li {
   background: var(--card);
   border: 1px solid var(--border);
   border-radius: var(--radius-card);
-  box-shadow: 0 8px 24px rgba(11, 31, 58, 0.22);
+  box-shadow: var(--shadow-popover);
 }
 
 .tab-popover[hidden] {
@@ -762,13 +770,13 @@ li {
   font-size: 1rem;
   font-weight: 700;
   letter-spacing: 0.16em;
-  color: #fff;
+  color: var(--on-navy);
 }
 
 .home-location {
   margin: var(--space-1) 0 0;
   font-size: 0.9rem;
-  color: rgba(255, 255, 255, 0.72);
+  color: var(--on-navy-muted);
 }
 
 /* Keeps a phrase on one line; the line can still break between phrases. */
@@ -795,8 +803,8 @@ li {
   border-radius: var(--radius-card);
   padding: var(--space-3) var(--space-2) var(--space-4);
   text-align: center;
-  color: #fff;
-  box-shadow: 0 4px 14px rgba(11, 31, 58, 0.25);
+  color: var(--on-navy);
+  box-shadow: var(--shadow-raised);
 }
 
 /* A slight diagonal fade from the team color to its darker shade. */
@@ -835,7 +843,7 @@ li {
   font-size: 0.9rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  opacity: 0.85;
+  /* Full white (no fading): white on the team colors is 5.9:1 and up. */
 }
 
 /* --- Tug-of-war bar ---
@@ -911,6 +919,7 @@ li {
 
 .projected-score strong {
   font-family: var(--font-display);
+  font-variant-numeric: tabular-nums;   /* equal-width digits: no jiggle when a number changes */
   font-size: 1.15rem;
 }
 
@@ -1016,6 +1025,12 @@ li {
   gap: var(--space-3);
 }
 
+/* min-width: 0 lets the title block shrink below its text width
+   (flex items refuse to by default), which the "…" above needs. */
+.round-card-top > div:first-child {
+  min-width: 0;
+}
+
 .round-card-title {
   font-family: var(--font-display);
   font-weight: 700;
@@ -1023,7 +1038,13 @@ li {
   line-height: 1.1;
   letter-spacing: 0.03em;
   text-transform: uppercase;
-  color: var(--navy);
+  color: var(--navy);  /* Always one line. In Barlow every title fits; but in the wider
+     fallback font shown for a split second while Barlow downloads,
+     "FRIDAY AM · GREENSOMES" would wrap and make every card taller,
+     then jump back. Instead it's briefly cut off with "…". */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .round-card-subtitle {
@@ -1034,6 +1055,7 @@ li {
 
 .round-card-available {
   font-family: var(--font-display);
+  font-variant-numeric: tabular-nums;   /* equal-width digits: no jiggle when a number changes */
   font-weight: 700;
   font-size: 1.4rem;
   line-height: 1;
@@ -1207,7 +1229,7 @@ li {
   justify-content: space-between;
   gap: var(--space-2);
   padding: 0 var(--space-3);
-  color: #fff;
+  color: var(--on-navy);
 }
 
 .sb-scorebar-usa {
@@ -1257,7 +1279,7 @@ li {
 .sb-tab {
   flex: 1 0 auto;
   min-width: 80px;
-  min-height: 52px;
+  height: 52px;   /* fixed, so the short-landscape rule below knows the tabs' height */
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1268,18 +1290,18 @@ li {
   border-bottom: 3px solid transparent;
   border-radius: 0;
   background: transparent;
-  color: rgba(255, 255, 255, 0.6);
+  color: var(--on-navy-muted);
   -webkit-tap-highlight-color: transparent;
 }
 
 .sb-tab:hover {
   background: transparent;
-  color: #fff;
+  color: var(--on-navy);
 }
 
 .sb-tab.is-selected {
-  color: #fff;
-  border-bottom-color: #fff;
+  color: var(--on-navy);
+  border-bottom-color: var(--on-navy);
 }
 
 .sb-tab-day {
@@ -1314,6 +1336,7 @@ li {
 
 .sb-round-score {
   margin-top: var(--space-2);
+  font-variant-numeric: tabular-nums;   /* equal-width digits: no jiggle when a number changes */
   font-family: var(--font-display);
   font-weight: 700;
   font-size: 1.3rem;
@@ -1345,9 +1368,66 @@ li {
   color: var(--muted);
 }
 
+/* --- Short landscape screens (under 500px tall) ---
+   Only the score bar stays pinned; the tabs scroll away with the page.
+   `display: contents` makes the pinned wrapper disappear from the
+   layout (its children act as if they sat directly in the page), so
+   the wrapper no longer pins anything. The score bar then pins itself,
+   and both it and the tabs carry their own edge-to-edge navy. */
+@media (max-height: 500px) {
+  .sb-sticky {
+    display: contents;
+  }
+
+  .sb-scorebar,
+  .sb-tabs {
+    background: var(--navy);
+    box-shadow: 0 0 0 100vmax var(--navy);
+    clip-path: inset(0 -100vmax);
+  }
+
+  .sb-scorebar {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    /* Same top-of-screen treatment the wrapper had in portrait. */
+    margin-top: calc(-1 * (var(--space-4) + env(safe-area-inset-top)));
+    padding: calc(var(--space-2) + env(safe-area-inset-top)) 0 var(--space-1);
+    /* The navy padding now sits around the halves, so the halves
+       (not the bar) carry the min-height. */
+    min-height: 0;
+  }
+
+  .sb-scorebar-side {
+    min-height: 44px;
+  }
+
+  .sb-tabs {
+    margin-top: 0;
+  }
+}
+
+/* --- Card layout ---
+   A grid of match cards: one column on phones; two equal columns once
+   the screen is at least 700px wide (phone landscape, tablets,
+   desktop), so cards stay roughly phone-width and hole boxes don't
+   balloon. minmax(0, 1fr) = equal shares that may shrink below their
+   content's natural width (plain 1fr can refuse to). */
+.sb-cards {
+  display: grid;
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+}
+
+@media (min-width: 700px) {
+  .sb-cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;   /* a short card doesn't stretch to match its neighbor */
+  }
+}
+
 /* --- Match card --- */
 .sb-card {
-  margin-top: var(--space-3);
   padding: var(--space-3);
   background: var(--card);
   border: 1px solid var(--border);
@@ -1375,6 +1455,7 @@ li {
    the mid-grey "halved" color would be too faint to read.) */
 .sb-pill {
   display: inline-block;
+  font-variant-numeric: tabular-nums;   /* equal-width digits: no jiggle when a number changes */
   padding: var(--space-1) 10px;
   border-radius: var(--radius-pill);
   font-family: var(--font-display);
@@ -1386,12 +1467,12 @@ li {
 
 .sb-pill-usa {
   background: var(--usa);
-  color: #fff;
+  color: var(--on-navy);
 }
 
 .sb-pill-eu {
   background: var(--eu);
-  color: #fff;
+  color: var(--on-navy);
 }
 
 .sb-pill-level {
@@ -1471,7 +1552,7 @@ li {
   font-weight: 700;
   font-size: 0.8rem;
   letter-spacing: 0.02em;
-  color: #fff;
+  color: var(--on-navy);
 }
 
 .sb-side-usa .sb-initials {
@@ -1523,9 +1604,14 @@ li {
   color: var(--eu);
 }
 
-/* The side with fewer points is faded a little. */
-.sb-points.is-trailing {
-  opacity: 0.45;
+/* The side with fewer points is shown in slate grey instead of its
+   team color. (Fading the team color with opacity couldn't reach the
+   4.5:1 contrast we want in sunlight; grey on the tint is 6.2:1.) The
+   "USA points" / "EU points" label and the tinted half still say whose
+   number it is. */
+.sb-side-usa .sb-points.is-trailing,
+.sb-side-eu .sb-points.is-trailing {
+  color: var(--muted);
 }
 
 /* The divider: a 2px white line with a small "vs" badge centered on it.
@@ -1580,6 +1666,7 @@ li {
 
 .sb-chip-value {
   font-family: var(--font-display);
+  font-variant-numeric: tabular-nums;   /* equal-width digits: no jiggle when a number changes */
   font-weight: 700;
   font-size: 0.95rem;
   white-space: nowrap;
@@ -1621,7 +1708,7 @@ li {
   font-family: var(--font-display);
   font-weight: 600;
   font-size: 0.8rem;
-  color: #fff;
+  color: var(--on-navy);
 }
 
 .sb-hole-usa {
@@ -1632,10 +1719,14 @@ li {
   background: var(--eu);
 }
 
-/* Dark number on grey: white would be too faint on this mid-grey. */
+/* Played holes show no number, just the color. A halved hole shows a
+   dark dash on grey (6.9:1), so in bright sun it can't be mistaken for
+   an unplayed hole, which keeps its number on white. */
 .sb-hole-halved {
   background: var(--halved);
   color: var(--text);
+  font-size: 1.1rem;
+  font-weight: 700;
 }
 
 .sb-hole-empty {
@@ -1657,7 +1748,7 @@ li {
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  border: 1px solid #fff;
+  border: 1px solid var(--on-navy);
 }
 
 .sb-dot-usa::after {
@@ -1694,6 +1785,7 @@ li {
   width: 18px;
   height: 18px;
   aspect-ratio: auto;
+  font-size: 0.7rem;
 }
 
 /* The legend's dot sample is a bit smaller to fit the 18px swatch. */
@@ -1713,4 +1805,127 @@ li {
   border-radius: var(--radius-card);
   text-align: center;
   color: var(--muted);
+}
+
+/* ==================================================================
+   7. POLISH: loading skeletons and "just changed" highlights
+   ================================================================== */
+
+/* --- Skeletons ---
+   Grey placeholder shapes shown before data arrives, so the page has
+   its final layout immediately instead of a "Loading…" line that then
+   jumps. The gentle pulse (opacity going down and back up) signals
+   "still loading". */
+.skeleton {
+  background: var(--empty);
+  border-radius: var(--radius-small);
+  animation: skeleton-pulse 1.4s ease-in-out infinite;
+}
+
+/* @keyframes defines an animation by its key moments: start (0%),
+   middle (50%), end (100%); the browser fills in between. */
+@keyframes skeleton-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+
+/* A placeholder card: white card containing grey bars. */
+.skeleton-card {
+  padding: var(--space-3) var(--space-4);
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+}
+
+.skeleton-line {
+  height: 14px;
+  margin-top: var(--space-2);
+}
+
+.skeleton-line:first-child {
+  margin-top: 0;
+}
+
+.skeleton-title { width: 55%; height: 18px; }
+.skeleton-short { width: 35%; }
+.skeleton-bar   { height: 8px; margin-top: var(--space-3); }
+.skeleton-block { height: 96px; margin-top: var(--space-3); border-radius: var(--radius-card); }
+.skeleton-grid  { height: 72px; margin-top: var(--space-3); }
+
+/* Scoreboard placeholder cards sit in the same spot as real cards. */
+.sb-skeleton {
+  margin-top: 0;   /* spacing comes from the .sb-cards grid gap */
+}
+
+/* --- "Just changed" highlights (about 600ms) ---
+   js/flash.js adds one of these classes to a number or card when a
+   score changes after the page has loaded, then removes it.
+   A changed NUMBER briefly grows 10% and glows in its team color; a
+   changed CARD gets a navy ring that fades out. transform: scale only
+   changes how the element is drawn, never the layout, so nothing
+   around it moves. */
+/* scale() has no effect on plain inline text, so inline numbers
+   (<span>/<strong>) become inline-blocks while flashing. Block-level
+   numbers (the big panel scores) are left as they are. */
+span.flash-usa,
+span.flash-eu,
+strong.flash-usa,
+strong.flash-eu {
+  display: inline-block;
+}
+
+.flash-usa {
+  animation: flash-number-usa 0.6s ease-out;
+}
+
+.flash-eu {
+  animation: flash-number-eu 0.6s ease-out;
+}
+
+.flash-card {
+  animation: flash-card 0.6s ease-out;
+}
+
+@keyframes flash-number-usa {
+  0%   { transform: scale(1); text-shadow: none; }
+  30%  { transform: scale(1.1); text-shadow: 0 0 12px var(--usa); }
+  100% { transform: scale(1); text-shadow: none; }
+}
+
+@keyframes flash-number-eu {
+  0%   { transform: scale(1); text-shadow: none; }
+  30%  { transform: scale(1.1); text-shadow: 0 0 12px var(--eu); }
+  100% { transform: scale(1); text-shadow: none; }
+}
+
+@keyframes flash-card {
+  0%   { box-shadow: 0 0 0 0 var(--flash-ring), var(--shadow-card); }
+  30%  { box-shadow: 0 0 0 4px var(--flash-ring), var(--shadow-card); }
+  100% { box-shadow: 0 0 0 0 var(--flash-ring), var(--shadow-card); }
+}
+
+/* "Reduce motion" setting: no pulsing, growing or fading. Skeletons
+   stay still; a change is marked by a plain underline (numbers) or a
+   static ring (cards) for the same 600ms, then it disappears. */
+@media (prefers-reduced-motion: reduce) {
+  .skeleton {
+    animation: none;
+  }
+
+  .flash-usa,
+  .flash-eu,
+  .flash-card {
+    animation: none;
+  }
+
+  .flash-usa,
+  .flash-eu {
+    text-decoration: underline;
+    text-decoration-thickness: 3px;
+    text-underline-offset: 4px;
+  }
+
+  .flash-card {
+    box-shadow: 0 0 0 3px var(--flash-ring), var(--shadow-card);
+  }
 }

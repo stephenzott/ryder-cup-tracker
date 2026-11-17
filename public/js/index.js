@@ -1,9 +1,9 @@
 // Live home-page standings. Subscribes to every round's matches
-// subcollection and re-derives United States / Europe point totals
+// subcollection and re-derives USA / EU point totals
 // from raw hole scores any time anything changes — for anyone with
 // the page open, from anyone else's phone. Internally still uses
 // generic 'a'/'b' side identifiers (matches the Firestore data and
-// scoring.js) -- team A = United States, team B = Europe.
+// scoring.js) -- team A = USA, team B = EU.
 //
 // The math (sumMatchPoints, pointsAvailable, TOTAL_POINTS_AVAILABLE)
 // is unchanged from before the restyle. What changed is only WHERE the
@@ -17,6 +17,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/11.3.1/firebase-firestore.js";
 import { ROUNDS, pointsAvailable, TOTAL_POINTS_AVAILABLE } from "./rounds-config.js";
 import { sumMatchPoints, scoreMatch } from "./scoring.js";
+import { flash } from "./flash.js";
 
 // ------------------------------------------------------------------
 // Number display. Points only ever come in halves (a halved segment
@@ -93,7 +94,7 @@ for (const round of ROUNDS) {
 // ------------------------------------------------------------------
 function roundCardHtml({ title, subtitle, href, available, a, b, projectedA, projectedB, isTotal }) {
   return `
-    <a class="round-card${isTotal ? " round-card-total" : ""}" href="${href}">
+    <a class="round-card${isTotal ? " round-card-total" : ""}" href="${href}" data-card="${isTotal ? "total" : href}">
       <div class="round-card-top">
         <div>
           <div class="round-card-title">${title}</div>
@@ -114,7 +115,14 @@ function roundCardHtml({ title, subtitle, href, available, a, b, projectedA, pro
   `;
 }
 
-function render() {
+// ------------------------------------------------------------------
+// "Just changed" highlights. render() remembers the numbers it showed
+// last time; when called with { highlight: true } (a real update after
+// the first load), anything that differs gets flashed.
+// ------------------------------------------------------------------
+let shown = null;   // the numbers from the previous render, or null before the first
+
+function render({ highlight = false } = {}) {
   let totalA = 0;
   let totalB = 0;
   let projTotalA = 0;
@@ -140,7 +148,9 @@ function render() {
     });
   }).join("");
 
-  document.getElementById("round-cards").innerHTML =
+  const cardsEl = document.getElementById("round-cards");
+  cardsEl.removeAttribute("aria-busy");   // real cards replace the skeletons now
+  cardsEl.innerHTML =
     cardsHtml +
     roundCardHtml({
       title: "Total",
@@ -164,12 +174,45 @@ function render() {
   document.getElementById("projected-a").textContent = formatPoints(projTotalA);
   document.getElementById("projected-b").textContent = formatPoints(projTotalB);
   document.getElementById("matches-complete").textContent = `${completedMatches} of ${TOTAL_MATCHES}`;
+
+  // Compare with the previous render and flash whatever changed.
+  const now = {
+    totalA, totalB, projTotalA, projTotalB,
+    // One short "fingerprint" string per round card: if any of its
+    // numbers change, the string changes.
+    cards: Object.fromEntries(ROUNDS.map((r) => {
+      const t = roundTotals[r.id];
+      return [`${r.id}.html`, `${t.a}|${t.b}|${t.projectedA}|${t.projectedB}`];
+    })),
+  };
+  if (highlight && shown) {
+    if (now.totalA !== shown.totalA) flash(document.getElementById("score-a"), "usa");
+    if (now.totalB !== shown.totalB) flash(document.getElementById("score-b"), "eu");
+    if (now.projTotalA !== shown.projTotalA) flash(document.getElementById("projected-a"), "usa");
+    if (now.projTotalB !== shown.projTotalB) flash(document.getElementById("projected-b"), "eu");
+    let anyCard = false;
+    for (const [href, fingerprint] of Object.entries(now.cards)) {
+      if (fingerprint !== shown.cards[href]) {
+        flash(cardsEl.querySelector(`[data-card="${href}"]`), "card");
+        anyCard = true;
+      }
+    }
+    if (anyCard) flash(cardsEl.querySelector('[data-card="total"]'), "card");
+  }
+  shown = now;
 }
 
 render();
 
+// Rounds whose first snapshot has arrived. A round's FIRST snapshot is
+// just the page loading (no highlight); every later one is a real
+// change from someone's phone (highlight).
+const loadedRounds = new Set();
+
 for (const round of ROUNDS) {
   onSnapshot(collection(db, "rounds", round.id, "matches"), (snapshot) => {
+    const isUpdate = loadedRounds.has(round.id);
+    loadedRounds.add(round.id);
     const matches = snapshot.docs.map((docSnap) => docSnap.data());
     roundTotals[round.id] = {
       // Same totals as before (a, b, projectedA, projectedB)...
@@ -179,6 +222,6 @@ for (const round of ROUNDS) {
       // its overall.complete flag here.
       completed: matches.filter((match) => scoreMatch(match).overall.complete).length,
     };
-    render();
+    render({ highlight: isUpdate });
   });
 }

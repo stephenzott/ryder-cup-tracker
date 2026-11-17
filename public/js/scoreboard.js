@@ -30,6 +30,7 @@ import { ROUNDS, pointsAvailable } from "./rounds-config.js";
 import { COURSES } from "./courses-config.js";
 import { scoreMatch, sumMatchPoints, holeWinner, strokeSidesForHole } from "./scoring.js";
 import { playerLink } from "./player-stats.js";
+import { flash } from "./flash.js";
 
 // ------------------------------------------------------------------
 // Page skeleton. The three containers are filled by render() below.
@@ -59,6 +60,20 @@ for (const round of ROUNDS) {
 // Which rounds' listeners have reported at least once. Used to know
 // when the "best default tab" can stop being recalculated.
 const roundsLoaded = new Set();
+// Whether the players list has arrived (until then names would show
+// as "(unknown)", so the cards wait behind skeletons).
+let playersLoaded = false;
+
+// "Just changed" bookkeeping for the highlights (see render()).
+// pendingCardFlashes: "round1/match2"-style keys of matches whose data
+//   changed in a LATER snapshot (not the first load); render() flashes
+//   their cards if they're on screen, then clears the set.
+// shownPoints: each match's points the last time it was drawn, to know
+//   which side's numeral to pulse.
+// shownTotals: the score bar's numbers last time.
+const pendingCardFlashes = new Set();
+const shownPoints = {};
+let shownTotals = null;
 
 // ------------------------------------------------------------------
 // Which round tab is selected.
@@ -290,17 +305,21 @@ function holeGridHtml(data) {
     else if (strokes.a) { dot = " sb-dot-usa"; words += ", stroke for USA"; }
     else if (strokes.b) { dot = " sb-dot-eu"; words += ", stroke for EU"; }
 
-    boxes += `<div class="sb-hole sb-hole-${fill}${dot}" role="img" aria-label="Hole ${h}, ${words}">${h}</div>`;
+    // What's printed inside: played holes show only their color (a dash
+    // on halved), unplayed holes show their number. The hole number is
+    // always in the aria-label for screen readers.
+    const mark = fill === "empty" ? h : fill === "halved" ? "–" : "";
+    boxes += `<div class="sb-hole sb-hole-${fill}${dot}" role="img" aria-label="Hole ${h}, ${words}">${mark}</div>`;
   }
   return `<div class="sb-holes" role="group" aria-label="Hole by hole, front nine then back nine">${boxes}</div>`;
 }
 
 // 4. A whole match card.
-function matchCardHtml(matchId, data) {
+function matchCardHtml(round, matchId, data) {
   const scored = scoreMatch(data);
   const { a, b } = scored.points;
   return `
-    <article class="sb-card">
+    <article class="sb-card" data-match-key="${round.id}/${matchId}">
       <div class="sb-card-top">
         <h3 class="sb-match-no">${matchId.replace("match", "Match ")}</h3>
         ${statusPill(scored.overall)}
@@ -326,11 +345,22 @@ const LEGEND_HTML = `
   <section class="sb-legend" aria-label="Legend">
     <div class="sb-legend-item"><span class="sb-hole sb-hole-usa sb-swatch"></span>USA won hole</div>
     <div class="sb-legend-item"><span class="sb-hole sb-hole-eu sb-swatch"></span>EU won hole</div>
-    <div class="sb-legend-item"><span class="sb-hole sb-hole-halved sb-swatch"></span>Halved</div>
-    <div class="sb-legend-item"><span class="sb-hole sb-hole-empty sb-swatch"></span>Not played</div>
+    <div class="sb-legend-item"><span class="sb-hole sb-hole-halved sb-swatch">–</span>Halved</div>
+    <div class="sb-legend-item"><span class="sb-hole sb-hole-empty sb-swatch">7</span>Not played (hole number)</div>
     <div class="sb-legend-item"><span class="sb-hole sb-hole-empty sb-dot-usa sb-swatch"></span>Handicap stroke (dot color = team)</div>
   </section>
 `;
+
+// Placeholder shown until the selected round's data (and the players
+// list) has actually arrived, instead of briefly claiming "no pairings".
+const SKELETON_CARD = `
+  <div class="skeleton-card sb-skeleton" aria-hidden="true">
+    <div class="skeleton skeleton-line skeleton-title"></div>
+    <div class="skeleton skeleton-block"></div>
+    <div class="skeleton skeleton-grid"></div>
+  </div>
+`;
+const SKELETON_HTML = `<div class="sb-cards">${SKELETON_CARD.repeat(3)}</div>`;
 
 // ------------------------------------------------------------------
 // render(): redraw everything from the current data. Runs on every
@@ -338,7 +368,7 @@ const LEGEND_HTML = `
 // scroll position, the tab strip's sideways scroll, and keyboard focus
 // on a tab.
 // ------------------------------------------------------------------
-function render() {
+function render({ highlight = false } = {}) {
   // Auto-pick the default tab until it's locked in (see above).
   if (!selectionLocked) {
     selectedRoundId = pickDefaultRound();
@@ -353,7 +383,8 @@ function render() {
 
   // 1. Overall score (all rounds, all matches -- same as before).
   const allMatches = ROUNDS.flatMap((round) => Object.values(matchesByRound[round.id]));
-  document.getElementById("sb-scorebar").innerHTML = scoreBarHtml(sumMatchPoints(allMatches));
+  const totals = sumMatchPoints(allMatches);
+  document.getElementById("sb-scorebar").innerHTML = scoreBarHtml(totals);
 
   // 2. Tabs.
   tabsEl.innerHTML = tabsHtml();
@@ -365,11 +396,42 @@ function render() {
     .sort(([idA], [idB]) => idA.localeCompare(idB));
   const roundTotals = sumMatchPoints(activeMatches.map(([, data]) => data));
 
-  const body = activeMatches.length
-    ? activeMatches.map(([matchId, data]) => matchCardHtml(matchId, data)).join("") + LEGEND_HTML
-    : `<p class="sb-empty">Pairings haven't been set for this round yet.</p>`;
+  const loaded = roundsLoaded.has(round.id) && playersLoaded;
+  let body;
+  if (!loaded) body = SKELETON_HTML;
+  // Cards go in a .sb-cards wrapper: one column on phones, two side by
+  // side on wider screens (see style.css).
+  else if (activeMatches.length) {
+    body = `<div class="sb-cards">${activeMatches.map(([matchId, data]) => matchCardHtml(round, matchId, data)).join("")}</div>` + LEGEND_HTML;
+  }
+  else body = `<p class="sb-empty">Pairings haven't been set for this round yet.</p>`;
 
-  document.getElementById("sb-round").innerHTML = roundHeaderHtml(round, roundTotals) + body;
+  const roundEl = document.getElementById("sb-round");
+  roundEl.innerHTML = roundHeaderHtml(round, roundTotals) + body;
+  // aria-busy tells screen readers this area is still loading.
+  if (loaded) roundEl.removeAttribute("aria-busy");
+  else roundEl.setAttribute("aria-busy", "true");
+
+  // "Just changed" highlights, only for real updates after the first load.
+  const scorebar = document.getElementById("sb-scorebar");
+  if (highlight && shownTotals) {
+    if (totals.a !== shownTotals.a) flash(scorebar.querySelector(".sb-scorebar-usa .sb-scorebar-points"), "usa");
+    if (totals.b !== shownTotals.b) flash(scorebar.querySelector(".sb-scorebar-eu .sb-scorebar-points"), "eu");
+  }
+  shownTotals = totals;
+  for (const [matchId, data] of activeMatches) {
+    const key = `${round.id}/${matchId}`;
+    const points = scoreMatch(data).points;
+    const before = shownPoints[key];
+    if (pendingCardFlashes.has(key)) {
+      const card = roundEl.querySelector(`[data-match-key="${key}"]`);
+      flash(card, "card");
+      if (before && points.a !== before.a) flash(card?.querySelector(".sb-side-usa .sb-points"), "usa");
+      if (before && points.b !== before.b) flash(card?.querySelector(".sb-side-eu .sb-points"), "eu");
+    }
+    shownPoints[key] = points;
+  }
+  pendingCardFlashes.clear();
 
   // Put the reader back where they were.
   tabsEl.scrollLeft = savedTabsScroll;
@@ -395,9 +457,17 @@ document.getElementById("sb-tabs").addEventListener("click", (event) => {
 
   // If the reader had scrolled down into the previous round's cards,
   // jump up so the new round starts just under the pinned block.
-  const sticky = document.querySelector(".sb-sticky");
+  // The pinned area's visible bottom edge. In portrait that's the whole
+  // pinned block (score bar + tabs). On short landscape screens only the
+  // score bar is pinned and the block itself has no box (its size reads
+  // as 0), so take whichever bottom edge is lower.
+  const stickyBottom = Math.max(
+    0,
+    document.querySelector(".sb-sticky").getBoundingClientRect().bottom,
+    document.getElementById("sb-scorebar").getBoundingClientRect().bottom
+  );
   const roundEl = document.getElementById("sb-round");
-  const roundTop = roundEl.getBoundingClientRect().top + window.scrollY - sticky.offsetHeight;
+  const roundTop = roundEl.getBoundingClientRect().top + window.scrollY - stickyBottom;
   if (window.scrollY > roundTop) window.scrollTo(0, roundTop);
 
   // Make sure the chosen tab is fully visible if the strip scrolls.
@@ -408,6 +478,7 @@ render();
 
 onSnapshot(collection(db, "players"), (snapshot) => {
   players = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+  playersLoaded = true;
   render();
 });
 
@@ -417,8 +488,22 @@ for (const round of ROUNDS) {
     snapshot.forEach((d) => {
       current[d.id] = d.data();
     });
+
+    // After the first load, note which matches actually changed so
+    // render() can highlight them. JSON.stringify turns a match's data
+    // into one string, a simple way to compare "is anything different?"
+    const isUpdate = roundsLoaded.has(round.id);
+    if (isUpdate) {
+      for (const [matchId, data] of Object.entries(current)) {
+        const previous = matchesByRound[round.id][matchId];
+        if (JSON.stringify(previous) !== JSON.stringify(data)) {
+          pendingCardFlashes.add(`${round.id}/${matchId}`);
+        }
+      }
+    }
+
     matchesByRound[round.id] = current;
     roundsLoaded.add(round.id);
-    render();
+    render({ highlight: isUpdate });
   });
 }
