@@ -148,20 +148,26 @@ p {
   margin: var(--space-2) 0 var(--space-3);
 }
 
+/* Links are navy, NOT blue. Blue is reserved for Team Europe, so a
+   blue link on a scoring page could be mistaken for "Europe". The
+   underline (kept on by default) is what marks a link. */
 a {
-  color: var(--eu);   /* blue reads as "link" by convention */
+  color: var(--navy);
+  text-decoration-thickness: 1px;
   text-underline-offset: 2px;
 }
 
 a:hover {
-  color: var(--eu-dark);
+  color: var(--navy-hover);
+  text-decoration-thickness: 2px;
 }
 
 /* A visible outline when an element is focused with the keyboard
    (Tab key). :focus-visible only shows it for keyboard focus, not on
-   every tap. An accessibility convention. */
+   every tap. An accessibility convention. Navy for the same reason
+   as links: no team color on general controls. */
 :focus-visible {
-  outline: 2px solid var(--eu);
+  outline: 2px solid var(--navy);
   outline-offset: 2px;
 }
 
@@ -244,7 +250,7 @@ input, select {
 }
 
 input:focus, select:focus {
-  border-color: var(--eu);
+  border-color: var(--navy);
 }
 
 /* Checkboxes keep their native size. The min-height/padding above are
@@ -697,7 +703,9 @@ li {
 }
 
 /* The page you're on inside a popover (e.g. "Round 2" while on round2). */
+/* Marked with a navy left bar and a light background rather than a
+   color change, since the link text is already navy. */
 .tab-popover a.is-active {
-  color: var(--eu);
-  box-shadow: inset 3px 0 0 var(--eu);   /* thin left bar, no layout shift */
+  background: var(--bg);
+  box-shadow: inset 3px 0 0 var(--navy);   /* thin left bar, no layout shift */
 }
