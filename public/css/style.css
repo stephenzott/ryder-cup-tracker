@@ -367,13 +367,9 @@ li {
   border-radius: var(--radius-card);
 }
 
-/* The round page's "jump to hole" picker. Base inputs already reach
-   44px; kept as its own rule because round.js targets this class. */
-.hole-select {
-  min-height: 44px;
-}
-
-/* One match on a round page: a white card with a soft shadow. */
+/* A plain white match card. Still used by the player page's
+   per-round list (player.js); the scoreboard and round pages use the
+   newer sb-card look. */
 .match-card {
   margin: var(--space-4) 0;
   padding: var(--space-4);
@@ -385,181 +381,14 @@ li {
 
 /* Headings normally carry space above them, but inside a card the
    card's own padding already provides it. ":first-child" means "the
-   first element inside the card", usually its "Match 1" heading. */
+   first element inside the card", usually its heading. */
 .match-card > :first-child {
   margin-top: 0;
 }
 
-/* --- Hole strips ---
-   The scoreboard's momentum strip: one small box per hole, colored by
-   who won it, no numbers. The row scrolls sideways on a narrow phone
-   instead of squeezing 18 boxes together. (It's a flex row, not a
-   <table>, so the table rule above doesn't apply.) */
-.hole-strip-numbers,
-.hole-strip {
-  display: flex;
-  gap: 2px;
-  overflow-x: auto;
-  margin-top: var(--space-2);
-  /* Room for the stroke dots, which poke 3px out of each box's top-right
-     corner, so the scroll container doesn't clip them. */
-  padding-top: 3px;
-  padding-right: 3px;
-}
-
-.hole-num {
-  flex: 0 0 1.5rem;
-  text-align: center;
-  font-family: var(--font-display);
-  font-weight: 600;
-  font-size: 0.8rem;
-  color: var(--muted);
-}
-
-.hole-box {
-  position: relative;   /* lets the stroke dot (::after) position itself against this box */
-  flex: 0 0 1.5rem;
-  height: 1.5rem;
-  border-radius: var(--radius-small);
-}
-
-/* The small gap between hole 9 and hole 10 (front / back nine). */
-.hole-gap {
-  flex: 0 0 0.5rem;
-}
-
-/* Who won the hole. USA = red, Europe = blue, always. */
-.hole-usa {
-  background: var(--usa);
-}
-
-.hole-eur {
-  background: var(--eu);
-}
-
-.hole-halved {
-  background: var(--halved);
-}
-
-.hole-empty {
-  background: var(--empty);
-  border: 1px solid var(--border);
-}
-
-/* A small dot in a hole box's corner meaning "a player gets a handicap
-   stroke here": red for a USA (team A) player, blue for a Europe (team
-   B) player, split half-and-half if both do. Drawn with ::after, a
-   generated extra element, so it sits on top of the box's own
-   win/loss/halve color. Only used on the scoreboard's .hole-box grid. */
-.stroke-dot-a::after,
-.stroke-dot-b::after,
-.stroke-dot-both::after {
-  content: "";
-  position: absolute;
-  top: -3px;
-  right: -3px;
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  border: 1px solid var(--on-navy);
-}
-
-.stroke-dot-a::after {
-  background: var(--usa);
-}
-
-.stroke-dot-b::after {
-  background: var(--eu);
-}
-
-.stroke-dot-both::after {
-  background: linear-gradient(90deg, var(--usa) 50%, var(--eu) 50%);
-}
-
-/* --- Hole-by-hole score entry panel on the round page --- */
-.hole-entry {
-  margin-top: var(--space-3);
-  padding: var(--space-3);
-  background: var(--bg);
-  border-radius: var(--radius-card);
-}
-
-.hole-entry > div {
-  margin-top: var(--space-2);
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-2);
-}
-
-.hole-entry label {
-  display: flex;
-  align-items: center;
-  gap: var(--space-1);
-}
-
-/* Best ball's two labeled inputs per side (one per player) stay
-   grouped by side, with some room between the USA and EUR groups. */
-.hole-entry-side {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-2);
-}
-
-/* The small score boxes are only 3.5rem (56px) wide, and with
-   border-box sizing that width includes padding. The usual 12px side
-   padding would leave about 30px for the digits, which is too tight
-   for "12" plus desktop spinner arrows. 4px sides leave about 46px. */
-.hole-entry input[type="number"] {
-  width: 3.5rem;
-  padding-left: var(--space-1);
-  padding-right: var(--space-1);
-  text-align: center;
-}
-
-/* --- Admin's strokes-given setup on the round page ---
-   Grey = no stroke, navy = a stroke on that hole (with a small number
-   inside for a 2nd stroke). Navy on purpose, NOT red/blue, so it can't
-   be confused with the win/loss colors. */
-.strokes-given-row {
-  margin-top: var(--space-4);
-  padding-top: var(--space-3);
-  border-top: 1px dashed var(--border);
-}
-
-.strokes-player {
-  margin: var(--space-3) 0;
-}
-
-/* Same narrow-box padding fix as the score inputs below. */
-.strokes-count-input {
-  width: 3.5rem;
-  padding-left: var(--space-1);
-  padding-right: var(--space-1);
-  text-align: center;
-}
-
-/* A read-only display, not a button. Strokes are always set with the
-   shot count + Apply (see round.js), never hole by hole. */
-.hole-toggle-btn {
-  flex: 0 0 1.5rem;
-  height: 1.5rem;
-  border-radius: var(--radius-small);
-  border: 1px solid var(--border);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--empty);
-  font-size: 0.65rem;
-  color: var(--muted);
-}
-
-.hole-toggle-btn.toggled {
-  background: var(--navy);
-  border-color: var(--navy);
-  color: var(--on-navy);
-}
+/* (The old hole-strip, stroke-dot and hole-entry rules lived here.
+   They were removed once the scoreboard and round pages moved to the
+   shared sb- match look in sections 6 and 8.) */
 
 /* --- Small "Saved" / "Error" messages next to buttons --- */
 .status-msg {
@@ -1928,4 +1757,645 @@ strong.flash-eu {
   .flash-card {
     box-shadow: 0 0 0 3px var(--flash-ring), var(--shadow-card);
   }
+}
+
+/* ==================================================================
+   8. ROUND PAGES  (round1-4.html; built by js/round.js)
+   Match cards reuse the shared sb- pieces (pill, sides, chips, hole
+   grid). The rd- classes below are round-page only: header, the
+   "Your match" bar, the score-entry panel, steppers and admin setup.
+   ================================================================== */
+
+/* --- Navy header band (edge to edge, same trick as the home header) --- */
+.rd-header {
+  background: var(--navy);
+  box-shadow: 0 0 0 100vmax var(--navy);
+  clip-path: inset(0 -100vmax);
+  margin-top: calc(-1 * (var(--space-4) + env(safe-area-inset-top)));
+  padding: calc(var(--space-5) + env(safe-area-inset-top)) 0 var(--space-5);
+  color: var(--on-navy);
+}
+
+.rd-eyebrow {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.9rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--on-navy-muted);
+}
+
+.rd-title {
+  margin: var(--space-1) 0 0;
+  color: var(--on-navy);
+}
+
+.rd-course {
+  margin: var(--space-1) 0 0;
+  font-size: 0.95rem;
+  color: var(--on-navy);
+}
+
+.rd-format {
+  margin: var(--space-1) 0 0;
+  font-size: 0.85rem;
+  color: var(--on-navy-muted);
+}
+
+/* Round score: team-colored pills with white text. (Red or blue TEXT
+   directly on navy would be too dark to read, under 3:1.) */
+.rd-score {
+  margin-top: var(--space-3);
+}
+
+.rd-score-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.rd-team {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: var(--radius-pill);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.2rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--on-navy);
+}
+
+.rd-team-usa {
+  background: var(--usa);
+}
+
+.rd-team-eu {
+  background: var(--eu);
+}
+
+.rd-dash {
+  color: var(--on-navy-muted);
+}
+
+.rd-available,
+.rd-proj {
+  font-size: 0.85rem;
+  color: var(--on-navy-muted);
+}
+
+.rd-proj {
+  margin-top: var(--space-1);
+}
+
+/* --- "Your match" bar ---
+   A full-width navy button pinned to the top while scrolling (only
+   shown when you're playing a match in this round). Tapping it scrolls
+   to your card. The base button look is reset. */
+.rd-mybar {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  min-height: 48px;
+  margin-top: var(--space-4);
+  padding: env(safe-area-inset-top) 0 0;
+  border: none;
+  border-radius: 0;
+  background: var(--navy);
+  box-shadow: 0 0 0 100vmax var(--navy);
+  clip-path: inset(0 -100vmax);
+  color: var(--on-navy);
+  text-align: left;
+}
+
+.rd-mybar:hover {
+  background: var(--navy);
+}
+
+.rd-mybar-label {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.8rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--on-navy-muted);
+}
+
+.rd-mybar-hole {
+  flex: 1;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.05rem;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+/* --- Match cards --- */
+
+/* When the "Your match" bar scrolls a card into view, stop just below
+   the pinned bar instead of hiding the card's top under it. */
+.rd-card {
+  scroll-margin-top: calc(60px + env(safe-area-inset-top));
+}
+
+/* Two card columns on wide screens, as on the scoreboard. */
+@media (min-width: 700px) {
+  #matches {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-3);
+    align-items: start;
+    margin-top: var(--space-3);
+  }
+
+  #matches > .sb-card,
+  #matches > .sb-skeleton {
+    margin-top: 0;
+  }
+}
+
+#matches > .sb-skeleton {
+  margin-top: var(--space-3);
+}
+
+/* Your own match gets a navy outline and a small "Your match" tag. */
+.rd-card.is-mine {
+  border: 2px solid var(--navy);
+}
+
+.rd-mine-tag {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  background: var(--navy);
+  color: var(--on-navy);
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+  vertical-align: middle;
+}
+
+.rd-empty-note {
+  margin: var(--space-1) 0 0;
+  font-style: italic;
+  color: var(--muted);
+}
+
+/* --- Score-entry panel --- */
+.rd-entry {
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border);
+}
+
+/* Current-hole bar: ◀ | hole info | ▶ on navy. The three grid columns
+   are 44px, "the rest", 44px. */
+.rd-holebar {
+  display: grid;
+  grid-template-columns: 44px 1fr 44px;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1);
+  background: var(--navy);
+  border-radius: var(--radius-card);
+  color: var(--on-navy);
+}
+
+.rd-nav {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--on-navy);
+  font-size: 1.1rem;
+}
+
+.rd-nav:hover {
+  background: var(--navy-hover);
+}
+
+/* Disabled ◀ on hole 1 / ▶ on hole 18: just faded, no navy box. */
+.rd-nav:disabled,
+.rd-nav:disabled:hover {
+  background: transparent;
+  border: none;
+  opacity: 0.3;
+}
+
+.rd-holeinfo {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1.1;
+}
+
+.rd-holeno {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.35rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.rd-holemeta {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.85rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--on-navy-muted);
+}
+
+/* Yardage guide / How to play links, each a full 44px tap target. */
+.rd-holelinks {
+  display: flex;
+  justify-content: center;
+  gap: var(--space-5);
+}
+
+.rd-holelinks a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+/* Tappable hole grid. Each box is a <button>, so the generic button
+   look (navy fill, border, hover color) has to be overridden. These
+   ".rd-holes ..." rules are more specific than the generic "button"
+   and "button:hover" rules, so they win. Boxes are 44px tall (a
+   comfortable tap target) instead of square. */
+.rd-holes {
+  margin-top: 0;
+}
+
+.rd-holes .sb-hole {
+  aspect-ratio: auto;
+  height: 44px;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-small);
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.rd-holes .sb-hole-usa { background: var(--usa); color: var(--on-navy); }
+.rd-holes .sb-hole-eu { background: var(--eu); color: var(--on-navy); }
+.rd-holes .sb-hole-halved { background: var(--halved); color: var(--text); font-size: 1.1rem; }
+.rd-holes .sb-hole-empty { background: var(--card); color: var(--muted); border: 1px solid var(--border); }
+
+.rd-holes .rd-hole-btn:hover {
+  filter: brightness(0.92);
+}
+
+/* The hole being entered: a thick navy outline and a bold number. */
+.sb-hole.is-current {
+  outline: 3px solid var(--navy);
+  outline-offset: 2px;
+  font-weight: 700;
+}
+
+/* --- Steppers and score boxes (editable cards) ---
+   Two columns: USA on the left (light red), EU on the right (light
+   blue). Best ball stacks two players inside each column. */
+.rd-inputs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+.rd-input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  padding: var(--space-2);
+  border-radius: var(--radius-card);
+}
+
+.rd-input-usa {
+  background: var(--usa-tint);
+}
+
+.rd-input-eu {
+  background: var(--eu-tint);
+}
+
+.rd-input-team {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.95rem;
+  letter-spacing: 0.1em;
+}
+
+.rd-input-usa .rd-input-team { color: var(--usa-dark); }
+.rd-input-eu .rd-input-team { color: var(--eu-dark); }
+
+.rd-input-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+/* "+1" = this player gets a handicap stroke on this hole. */
+.rd-stroke-badge {
+  display: inline-block;
+  margin-left: 4px;
+  padding: 0 6px;
+  border-radius: var(--radius-pill);
+  background: var(--navy);
+  color: var(--on-navy);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.75rem;
+  vertical-align: 1px;
+}
+
+/* − [box] +. The box takes whatever width is left (flex: 1). */
+.rd-stepper {
+  display: flex;
+  gap: 4px;
+}
+
+.rd-step {
+  flex: none;
+  width: 44px;
+  min-height: 48px;
+  padding: 0;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--navy);
+  font-size: 1.5rem;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.rd-step:hover {
+  background: var(--bg);
+  border-color: var(--halved);
+}
+
+.rd-stepper .hole-score-input {
+  flex: 1;
+  min-width: 0;
+  width: 100%;
+  min-height: 48px;
+  padding: 0;
+  text-align: center;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.6rem;
+  font-variant-numeric: tabular-nums;
+  /* Hide the browser's tiny up/down arrows; the big − / + replace them. */
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+.rd-stepper .hole-score-input::-webkit-inner-spin-button,
+.rd-stepper .hole-score-input::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+/* The faint par hint in an empty box. */
+.rd-stepper .hole-score-input::placeholder {
+  color: var(--halved);
+  font-weight: 600;
+}
+
+/* Full-width Save button, with "Not saved yet" and status underneath. */
+.rd-save-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+.rd-save {
+  width: 100%;
+  min-height: 52px;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.15rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.rd-unsaved {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.rd-unsaved::before {
+  content: "● ";
+  color: var(--muted);
+}
+
+/* --- Read-only hole view (cards you can't score) --- */
+.rd-readonly {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+.rd-ro-side {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px var(--space-2);
+  min-height: 48px;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-card);
+}
+
+.rd-ro-usa { background: var(--usa-tint); color: var(--usa-dark); }
+.rd-ro-eu { background: var(--eu-tint); color: var(--eu-dark); }
+
+.rd-ro-team {
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: 0.1em;
+}
+
+.rd-ro-value {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.6rem;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.rd-ro-player {
+  font-size: 0.85rem;
+  color: var(--text);
+}
+
+.rd-ro-player strong {
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.rd-locked-note {
+  margin: var(--space-2) 0 0;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+/* --- Admin: match setup --- */
+.rd-admin h2 {
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.rd-admin-intro,
+.rd-help {
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.rd-setup-card {
+  margin-top: var(--space-3);
+  padding: var(--space-3);
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+}
+
+.rd-setup-subtitle {
+  margin: 0 0 var(--space-2);
+  font-size: 1.1rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* USA dropdowns, then EU dropdowns; side by side when there's room. */
+.rd-setup-sides {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: var(--space-2);
+}
+
+.rd-setup-side {
+  display: grid;
+  gap: 6px;
+  padding-left: var(--space-2);
+  border-left: 4px solid;
+}
+
+.rd-setup-usa { border-left-color: var(--usa); }
+.rd-setup-eu { border-left-color: var(--eu); }
+
+.rd-setup-team {
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: 0.1em;
+}
+
+.rd-setup-side select {
+  width: 100%;
+}
+
+.rd-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+/* Strokes given (rounds 3 and 4). Grey box = no stroke, navy = a
+   stroke on that hole. Navy on purpose, NOT red/blue, so it can't be
+   confused with the win/loss colors. The number in each box is the
+   hole's stroke index. */
+.strokes-given-row {
+  margin-top: var(--space-4);
+  padding-top: var(--space-3);
+  border-top: 1px dashed var(--border);
+}
+
+.strokes-player {
+  margin: var(--space-3) 0;
+}
+
+.strokes-player-name {
+  font-weight: 600;
+}
+
+/* The name link gets a full 44px tap area. (The checkbox beside "Avoid
+   9 & 18" is small, but it sits inside its 44px-tall label, and tapping
+   anywhere on a label ticks its checkbox.) */
+.strokes-player-name a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+}
+
+.strokes-player-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: 6px;
+}
+
+.strokes-count-label,
+.strokes-avoid-label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 44px;
+  font-size: 0.9rem;
+}
+
+.strokes-count-input {
+  width: 4rem;
+  padding-left: var(--space-1);
+  padding-right: var(--space-1);
+  text-align: center;
+}
+
+/* 9 columns, so the 18 boxes form two rows: front nine, back nine. */
+.strokes-toggle-strip {
+  display: grid;
+  grid-template-columns: repeat(9, 1fr);
+  gap: 4px;
+  margin-top: var(--space-2);
+}
+
+.hole-toggle-btn {
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-small);
+  border: 1px solid var(--border);
+  background: var(--empty);
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.hole-toggle-btn.toggled {
+  background: var(--navy);
+  border-color: var(--navy);
+  color: var(--on-navy);
 }

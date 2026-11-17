@@ -18,20 +18,8 @@ import {
 import { ROUNDS, pointsAvailable, TOTAL_POINTS_AVAILABLE } from "./rounds-config.js";
 import { sumMatchPoints, scoreMatch } from "./scoring.js";
 import { flash } from "./flash.js";
-
-// ------------------------------------------------------------------
-// Number display. Points only ever come in halves (a halved segment
-// is 0.5 each), so we show 12.5 as "12½" and 0.5 as "½", the
-// traditional way match-play scores are written. Anything that isn't
-// a whole or half number (shouldn't happen) is shown as-is.
-// ------------------------------------------------------------------
-function formatPoints(n) {
-  const whole = Math.floor(n);
-  const fraction = n - whole;
-  if (fraction === 0) return String(whole);
-  if (fraction === 0.5) return whole === 0 ? "½" : `${whole}½`;
-  return String(n);
-}
+// formatPoints shows halves as "½" (e.g. 12½); shared with the scoreboard and round pages.
+import { formatPoints } from "./match-ui.js";
 
 // Width of a tug-of-war fill, as a CSS percentage: this side's points
 // as a share of everything available, capped at 100% just in case.
