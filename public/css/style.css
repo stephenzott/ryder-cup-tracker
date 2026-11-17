@@ -1,47 +1,269 @@
-/* Shared stylesheet for every page in the app. Kept deliberately plain
-   (system fonts, no framework) so there's one simple file to read. */
+/* Shared stylesheet for every page in the app. One plain file, no
+   framework or build step.
+
+   HOW THIS FILE IS ORGANIZED
+   1. Design tokens (:root variables) -- every color, spacing step and
+      radius is defined ONCE here and referred to by name below.
+   2. Base elements (body, headings, links, buttons, forms, tables).
+   3. Shared components (match cards, unlock bar, hole strips, ...).
+   4. Bottom tab bar (built by js/nav.js).
+
+   ABOUT CSS VARIABLES ("custom properties")
+   `--name: value;` defines a variable; `var(--name)` reads it. Putting
+   them on :root (the <html> element) makes them visible to every
+   element on the page. This is standard practice: change a value here
+   and it changes everywhere, so colors can never drift apart. */
+
+/* ==================================================================
+   1. DESIGN TOKENS
+   ================================================================== */
+:root {
+  /* --- Team colors. USA is ALWAYS red, Europe ALWAYS blue, on every
+     scoring view. "dark" is for text/borders on a light background or
+     a pressed state; "tint" is a pale wash for backgrounds. --- */
+  --usa: #C8102E;
+  --usa-dark: #8E0B20;
+  --usa-tint: #FBE9EC;
+  --eu: #1F3F8F;
+  --eu-dark: #12285E;
+  --eu-tint: #E8EDF8;
+
+  /* --- Team accent palettes for later page designs (team pages,
+     player pages). Defined now so the names exist; NOT used yet.
+     USA = red / white / blue, Europe = blue / yellow. --- */
+  --usa-accent-red: #C8102E;
+  --usa-accent-white: #FFFFFF;
+  --usa-accent-blue: #0A3161;
+  --eu-accent-blue: #1F3F8F;
+  --eu-accent-yellow: #FFCC00;
+
+  /* --- Neutrals --- */
+  --navy: #0B1F3A;          /* header / tab bar / primary buttons */
+  --navy-hover: #16325A;    /* a slightly lighter navy for hover/press */
+  --bg: #F2F5F9;            /* page background */
+  --card: #FFFFFF;          /* card / table surface */
+  --text: #0F1B2D;          /* body text */
+  --muted: #5B6B7F;         /* secondary text */
+  --border: #D9E0E8;        /* hairlines, input borders */
+  --halved: #9AA5B1;        /* a halved hole */
+  --empty: #E6EBF1;         /* a hole not played yet */
+
+  /* --- Status message colors (not team colors). A conventional
+     "saved" green and "error" red-brown, darker than the team red so
+     an error never reads as "USA". --- */
+  --ok: #1E7B3C;
+  --error: #A3001B;
+
+  /* --- Spacing scale. Every margin/padding/gap picks from these six
+     steps instead of arbitrary numbers, which keeps the rhythm even. */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+
+  /* --- Corners and shadow --- */
+  --radius-card: 8px;
+  --radius-pill: 999px;    /* any value larger than half the height gives a full pill */
+  --radius-small: 4px;     /* small boxes: hole squares, inputs */
+  --shadow-card: 0 1px 2px rgba(15, 27, 45, 0.06), 0 2px 8px rgba(15, 27, 45, 0.06);
+
+  /* --- Fonts. If Google Fonts fails to load, each list falls back to
+     the phone's built-in fonts, left to right. --- */
+  --font-display: "Barlow Condensed", "Arial Narrow", "Roboto Condensed", system-ui, sans-serif;
+  --font-body: "Inter", -apple-system, system-ui, "Segoe UI", Roboto, sans-serif;
+
+  /* --- Bottom tab bar height (not counting the iPhone home-indicator
+     area, which is added on top with env(safe-area-inset-bottom)). */
+  --tabbar-height: 60px;
+}
+
+/* ==================================================================
+   2. BASE ELEMENTS
+   ================================================================== */
+
+/* box-sizing: border-box makes an element's width INCLUDE its padding
+   and border. Without it, "width: 100%" plus padding overflows the
+   screen. Standard practice on nearly every modern site. */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+/* The page background covers the whole screen, while <body> stays a
+   readable column of at most 900px. */
+html {
+  background: var(--bg);
+}
 
 body {
-  font-family: -apple-system, system-ui, Segoe UI, Roboto, sans-serif;
+  font-family: var(--font-body);
+  font-size: 1rem;
+  line-height: 1.5;
+  color: var(--text);
+  background: var(--bg);
   max-width: 900px;
   margin: 0 auto;
-  padding: 1rem 1.25rem 3rem;
-  color: #1a1a1a;
-  line-height: 1.5;
+  /* Bottom padding = tab bar height + the iPhone safe area + breathing
+     room, so the last line of content never hides behind the fixed bar.
+     env(safe-area-inset-*) is the height of the iPhone's notch/home bar
+     area (0 on other devices). It only reports a real value because the
+     viewport tag says viewport-fit=cover. */
+  padding:
+    var(--space-4)
+    max(var(--space-4), env(safe-area-inset-right))
+    calc(var(--tabbar-height) + env(safe-area-inset-bottom) + var(--space-6))
+    max(var(--space-4), env(safe-area-inset-left));
+  /* Stops iOS enlarging text on its own when the phone is rotated. */
+  -webkit-text-size-adjust: 100%;
 }
 
-nav {
-  font-size: 0.95rem;
-  margin-bottom: 1.5rem;
-  padding-bottom: 1rem;
-  border-bottom: 1px solid #ddd;
-}
-
-nav a {
-  display: inline-block;
-  margin-right: 0.5rem;
-  padding: 0.3rem 0;
-  text-decoration: none;
-  color: #1a5c2a;
-}
-
-nav a:hover {
-  text-decoration: underline;
+/* Headings use the tall condensed face, which fits more words on a
+   narrow phone and gives the "scoreboard" look. */
+h1, h2, h3 {
+  font-family: var(--font-display);
+  font-weight: 700;
+  line-height: 1.15;
+  color: var(--navy);
+  margin: var(--space-5) 0 var(--space-2);
 }
 
 h1 {
-  font-size: 1.6rem;
-  margin-bottom: 0.25rem;
+  font-size: 2rem;
+  margin-top: var(--space-2);
+  text-transform: uppercase;
+  letter-spacing: 0.01em;
 }
 
-/* Tables with many columns (the schedule page especially) are wider
-   than a phone screen no matter how much cell text wraps. Rather than
-   let them get silently clipped at the edge, turn each table into its
-   own horizontally-scrollable strip: `display: block` takes the table
-   out of normal table-sizing rules so overflow-x can apply to it
-   directly, while its row/cell children keep their default table
-   display values, so columns still line up correctly within the
-   scrollable strip. */
+h2 {
+  font-size: 1.5rem;
+}
+
+h3 {
+  font-size: 1.2rem;
+  font-weight: 600;
+}
+
+p {
+  margin: var(--space-2) 0 var(--space-3);
+}
+
+a {
+  color: var(--eu);   /* blue reads as "link" by convention */
+  text-underline-offset: 2px;
+}
+
+a:hover {
+  color: var(--eu-dark);
+}
+
+/* A visible outline when an element is focused with the keyboard
+   (Tab key). :focus-visible only shows it for keyboard focus, not on
+   every tap. An accessibility convention. */
+:focus-visible {
+  outline: 2px solid var(--eu);
+  outline-offset: 2px;
+}
+
+/* --- Buttons --- */
+button {
+  font-family: var(--font-body);
+  font-size: 0.95rem;
+  font-weight: 600;
+  /* Height of at least 44px (Apple's minimum tap target) however short
+     the label is. */
+  min-height: 44px;
+  padding: var(--space-2) var(--space-4);
+  border: 1px solid var(--navy);
+  background: var(--navy);
+  color: #fff;
+  border-radius: var(--radius-card);
+  cursor: pointer;
+  /* Removes the grey flash iOS draws when you tap a link or button. */
+  -webkit-tap-highlight-color: transparent;
+}
+
+button:hover {
+  background: var(--navy-hover);
+  border-color: var(--navy-hover);
+}
+
+/* A secondary button is outlined instead of filled, for less
+   important actions (Prev/Next, Remove, Switch, Apply). */
+button.secondary {
+  background: var(--card);
+  color: var(--navy);
+  border-color: var(--border);
+}
+
+button.secondary:hover {
+  background: var(--bg);
+}
+
+/* The round page disables Prev on hole 1, Next on hole 18, and Save
+   when you can't edit. Make that state obvious. */
+button:disabled,
+button:disabled:hover {
+  opacity: 0.45;
+  cursor: not-allowed;
+  background: var(--navy);
+  border-color: var(--navy);
+}
+
+button.secondary:disabled,
+button.secondary:disabled:hover {
+  background: var(--card);
+  border-color: var(--border);
+}
+
+/* --- Forms ---
+   Applies to every <form> on the site: fields wrap onto their own
+   lines on a narrow screen instead of squeezing together. */
+form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+input, select {
+  font-family: var(--font-body);
+  /* 16px (1rem) is the smallest font size at which iOS Safari does NOT
+     zoom the whole page when you tap a field. A mobile-web workaround,
+     not a design choice: don't go lower. */
+  font-size: 1rem;
+  color: var(--text);
+  background: var(--card);
+  min-height: 44px;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  /* Stops a long dropdown option or placeholder from pushing the field
+     wider than the phone screen. */
+  max-width: 100%;
+}
+
+input:focus, select:focus {
+  border-color: var(--eu);
+}
+
+/* Checkboxes keep their native size. The min-height/padding above are
+   for text fields, not tick boxes. */
+input[type="checkbox"], input[type="radio"] {
+  min-height: 0;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  accent-color: var(--navy);   /* colors the native tick */
+}
+
+/* --- Tables ---
+   Tables with many columns (the schedule especially) are wider than a
+   phone no matter how much the text wraps. So each table becomes its
+   own sideways-scrollable strip: `display: block` takes the table out
+   of the normal table-width rules so overflow-x can apply to it, while
+   rows and cells keep their table layout and columns still line up.
+   The page itself never scrolls sideways; only the table does. */
 table {
   display: block;
   overflow-x: auto;
@@ -49,151 +271,153 @@ table {
   width: 100%;
   max-width: 100%;
   border-collapse: collapse;
-  margin: 1rem 0;
+  margin: var(--space-4) 0;
+  background: var(--card);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
 }
 
 th, td {
   text-align: left;
-  padding: 0.5rem 0.6rem;
-  border-bottom: 1px solid #e0e0e0;
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
 }
 
+/* No line under the last row, since the card edge already closes it. */
+tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* Column headers: small, uppercase, condensed, like a scoreboard. */
 th {
-  background: #f4f6f4;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  background: var(--bg);
+  white-space: nowrap;
 }
 
-/* A single shared visual language for "this needs the right code
-   entered before it'll work" — used on admin controls and score-entry
-   forms alike. */
+ul {
+  padding-left: var(--space-5);
+}
+
+li {
+  margin: var(--space-1) 0;
+}
+
+/* ==================================================================
+   3. SHARED COMPONENTS
+   ================================================================== */
+
+/* "Needs the right code before it works": admin controls and
+   score-entry forms. Faded and untappable until unlocked. */
 .locked {
   opacity: 0.55;
   pointer-events: none;
 }
 
+/* The unlock prompt (built by auth.js). A white card holding a
+   dropdown or code field plus a button, wrapping on narrow screens. */
 .unlock-bar {
   display: flex;
-  gap: 0.5rem;
-  align-items: center;
-  margin: 1rem 0;
-  padding: 0.75rem;
-  background: #f4f6f4;
-  border-radius: 6px;
-}
-
-/* Applies to every form on the site (currently just "Add player," but
-   any future form gets this for free): lets the fields wrap onto
-   their own lines on a narrow screen instead of squeezing together,
-   with comfortable spacing either way. */
-form {
-  display: flex;
   flex-wrap: wrap;
-  gap: 0.5rem;
+  gap: var(--space-2);
   align-items: center;
+  margin: var(--space-4) 0;
+  padding: var(--space-3);
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
 }
 
-input, select {
-  padding: 0.5rem;
-  /* 16px is the magic number below which iOS Safari zooms the whole
-     page in when you tap into a field — a standard mobile-web gotcha,
-     not a design choice. 1rem = 16px here avoids it. */
-  font-size: 1rem;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-}
-
-.unlock-bar input {
-  padding: 0.4rem 0.5rem;
-  font-size: 1rem;
-}
-
-/* The round page's "jump to hole" picker -- the generic input/select
-   padding above comes out under the ~44px minimum tap-target size, so
-   this bumps just this one select up to that height. */
+/* The round page's "jump to hole" picker. Base inputs already reach
+   44px; kept as its own rule because round.js targets this class. */
 .hole-select {
   min-height: 44px;
 }
 
-button {
-  /* Padding sized so the tappable area comes out close to the ~44px
-     minimum touch-target size recommended for phones, not just
-     whatever the text needs. */
-  padding: 0.6rem 1rem;
-  font-size: 0.95rem;
-  border: 1px solid #1a5c2a;
-  background: #1a5c2a;
-  color: white;
-  border-radius: 4px;
-  cursor: pointer;
-}
-
-button:hover {
-  background: #134420;
-}
-
-button.secondary {
-  background: white;
-  color: #1a5c2a;
-}
-
+/* One match on a round page: a white card with a soft shadow. */
 .match-card {
-  margin: 1.5rem 0;
-  padding: 1rem;
-  border: 1px solid #e0e0e0;
-  border-radius: 6px;
+  margin: var(--space-4) 0;
+  padding: var(--space-4);
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
 }
 
-/* The scoreboard's momentum strip: one small box per hole, no numbers
-   or scores in them on purpose -- just color. display:block+overflow
-   on the row (not a <table>, so the earlier table-scroll rule doesn't
-   apply) keeps it swipeable on a phone without squeezing 18 boxes
-   into a too-narrow screen. */
+/* Headings normally carry space above them, but inside a card the
+   card's own padding already provides it. ":first-child" means "the
+   first element inside the card", usually its "Match 1" heading. */
+.match-card > :first-child {
+  margin-top: 0;
+}
+
+/* --- Hole strips ---
+   The scoreboard's momentum strip: one small box per hole, colored by
+   who won it, no numbers. The row scrolls sideways on a narrow phone
+   instead of squeezing 18 boxes together. (It's a flex row, not a
+   <table>, so the table rule above doesn't apply.) */
 .hole-strip-numbers,
 .hole-strip {
   display: flex;
   gap: 2px;
   overflow-x: auto;
-  margin-top: 0.4rem;
+  margin-top: var(--space-2);
+  /* Room for the stroke dots, which poke 3px out of each box's top-right
+     corner, so the scroll container doesn't clip them. */
+  padding-top: 3px;
+  padding-right: 3px;
 }
 
 .hole-num {
   flex: 0 0 1.5rem;
   text-align: center;
-  font-size: 0.75rem;
-  color: #666;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.8rem;
+  color: var(--muted);
 }
 
 .hole-box {
-  position: relative;
+  position: relative;   /* lets the stroke dot (::after) position itself against this box */
   flex: 0 0 1.5rem;
   height: 1.5rem;
-  border-radius: 3px;
+  border-radius: var(--radius-small);
 }
 
+/* The small gap between hole 9 and hole 10 (front / back nine). */
 .hole-gap {
   flex: 0 0 0.5rem;
 }
 
+/* Who won the hole. USA = red, Europe = blue, always. */
 .hole-usa {
-  background: #2962ff;
+  background: var(--usa);
 }
 
 .hole-eur {
-  background: #d32f2f;
+  background: var(--eu);
 }
 
 .hole-halved {
-  background: #9e9e9e;
+  background: var(--halved);
 }
 
 .hole-empty {
-  background: #eee;
-  border: 1px solid #ddd;
+  background: var(--empty);
+  border: 1px solid var(--border);
 }
 
-/* Small marker in the corner of a hole box showing someone's getting
-   a handicap stroke there -- blue for a USA player, red for Europe,
-   independent of (and layered on top of) the box's own win/loss/halve
-   fill color. Only used on the scoreboard's .hole-box grid. */
+/* A small dot in a hole box's corner meaning "a player gets a handicap
+   stroke here": red for a USA (team A) player, blue for a Europe (team
+   B) player, split half-and-half if both do. Drawn with ::after, a
+   generated extra element, so it sits on top of the box's own
+   win/loss/halve color. Only used on the scoreboard's .hole-box grid. */
 .stroke-dot-a::after,
 .stroke-dot-b::after,
 .stroke-dot-both::after {
@@ -204,90 +428,50 @@ button.secondary {
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  border: 1px solid white;
+  border: 1px solid #fff;
 }
 
 .stroke-dot-a::after {
-  background: #2962ff;
+  background: var(--usa);
 }
 
 .stroke-dot-b::after {
-  background: #d32f2f;
+  background: var(--eu);
 }
 
 .stroke-dot-both::after {
-  background: linear-gradient(90deg, #2962ff 50%, #d32f2f 50%);
+  background: linear-gradient(90deg, var(--usa) 50%, var(--eu) 50%);
 }
 
+/* --- Hole-by-hole score entry panel on the round page --- */
 .hole-entry {
-  margin-top: 0.75rem;
-  padding: 0.75rem;
-  background: #f4f6f4;
-  border-radius: 6px;
+  margin-top: var(--space-3);
+  padding: var(--space-3);
+  background: var(--bg);
+  border-radius: var(--radius-card);
 }
 
 .hole-entry > div {
-  margin-top: 0.5rem;
+  margin-top: var(--space-2);
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.5rem;
+  gap: var(--space-2);
 }
 
 .hole-entry label {
   display: flex;
   align-items: center;
-  gap: 0.3rem;
+  gap: var(--space-1);
 }
 
 /* Best ball's two labeled inputs per side (one per player) stay
-   visually grouped by side, with a little breathing room between the
-   USA group and the EUR group. */
+   grouped by side, with some room between the USA and EUR groups. */
 .hole-entry-side {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.5rem;
-}
-
-/* Admin's strokes-given setup. Grey = no stroke, green = toggled on
-   (with a small number inside if it's a 2nd stroke on that hole) --
-   deliberately different colors from the hole-box win/loss/halve
-   convention so the two don't read as the same kind of thing. */
-.strokes-given-row {
-  margin-top: 1rem;
-  padding-top: 0.75rem;
-  border-top: 1px dashed #ccc;
-}
-
-.strokes-player {
-  margin: 0.75rem 0;
-}
-
-.strokes-count-input {
-  width: 3.5rem;
-  text-align: center;
-}
-
-/* A read-only display, not a button -- strokes are always set via the
-   shot count + Apply (see round.js), never picked hole-by-hole. */
-.hole-toggle-btn {
-  flex: 0 0 1.5rem;
-  height: 1.5rem;
-  border-radius: 3px;
-  border: 1px solid #ccc;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: #eee;
-  font-size: 0.65rem;
-  color: #555;
-}
-
-.hole-toggle-btn.toggled {
-  background: #1a5c2a;
-  border-color: #1a5c2a;
-  color: white;
+  gap: var(--space-2);
 }
 
 .hole-entry input[type="number"] {
@@ -295,15 +479,216 @@ button.secondary {
   text-align: center;
 }
 
+/* --- Admin's strokes-given setup on the round page ---
+   Grey = no stroke, navy = a stroke on that hole (with a small number
+   inside for a 2nd stroke). Navy on purpose, NOT red/blue, so it can't
+   be confused with the win/loss colors. */
+.strokes-given-row {
+  margin-top: var(--space-4);
+  padding-top: var(--space-3);
+  border-top: 1px dashed var(--border);
+}
+
+.strokes-player {
+  margin: var(--space-3) 0;
+}
+
+.strokes-count-input {
+  width: 3.5rem;
+  text-align: center;
+}
+
+/* A read-only display, not a button. Strokes are always set with the
+   shot count + Apply (see round.js), never hole by hole. */
+.hole-toggle-btn {
+  flex: 0 0 1.5rem;
+  height: 1.5rem;
+  border-radius: var(--radius-small);
+  border: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--empty);
+  font-size: 0.65rem;
+  color: var(--muted);
+}
+
+.hole-toggle-btn.toggled {
+  background: var(--navy);
+  border-color: var(--navy);
+  color: #fff;
+}
+
+/* --- Small "Saved" / "Error" messages next to buttons --- */
 .status-msg {
   font-size: 0.9rem;
-  margin-left: 0.5rem;
+  margin-left: var(--space-2);
 }
 
 .status-msg.error {
-  color: #b00020;
+  color: var(--error);
 }
 
 .status-msg.ok {
-  color: #1a5c2a;
+  color: var(--ok);
+}
+
+/* ==================================================================
+   4. BOTTOM TAB BAR  (HTML is built by js/nav.js)
+   ================================================================== */
+
+/* The bar itself: pinned to the bottom of the screen, full width, navy.
+   position: fixed takes it out of the page flow, so it stays put while
+   the page scrolls. The extra bottom padding fills the iPhone's
+   home-indicator area with navy so the tab buttons sit above it. */
+.tabbar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 100;   /* draw on top of page content */
+  background: var(--navy);
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+  box-shadow: 0 -2px 10px rgba(11, 31, 58, 0.18);
+}
+
+/* Six tabs in a row, each an equal share of the width (flex: 1).
+   max-width centers the row on a wide screen instead of spreading
+   six icons across a desktop monitor. */
+.tabbar-row {
+  display: flex;
+  max-width: 600px;
+  margin: 0 auto;
+  height: var(--tabbar-height);
+}
+
+/* One tab: icon stacked over its label. Used for both <a> tabs (Home,
+   Scoreboard, Roster, Stats) and <button> tabs (Rounds, More, which
+   open popovers), so the button defaults are reset here. */
+.tab {
+  flex: 1 1 0;
+  min-width: 0;   /* lets a tab shrink below its label width instead of overflowing */
+  min-height: 44px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: var(--space-1) 0;
+  margin: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.62);
+  text-decoration: none;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.8rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  line-height: 1;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Undo the generic button:hover / :disabled styles above for tabs. */
+.tab:hover {
+  background: transparent;
+  color: #fff;
+}
+
+.tab svg {
+  width: 24px;
+  height: 24px;
+  /* The icons are line drawings that use "currentColor", so they
+     automatically take the tab's text color (dim, or white when active). */
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.tab-label {
+  white-space: nowrap;
+}
+
+/* On the narrowest phones (360px) each tab is only 60px wide, and
+   "SCOREBOARD" at the normal size is just wider than that. A media
+   query applies the rules inside it only when the condition is true,
+   here "screen narrower than 380px", so the labels shrink a touch. */
+@media (max-width: 380px) {
+  .tab {
+    font-size: 0.72rem;
+    letter-spacing: 0.01em;
+  }
+}
+
+/* The current page's tab: white, plus a short white bar on top. */
+.tab.is-active {
+  color: #fff;
+  position: relative;
+}
+
+.tab.is-active::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 28%;
+  right: 28%;
+  height: 3px;
+  border-radius: 0 0 3px 3px;
+  background: #fff;
+}
+
+/* A popover tab that's open right now. */
+.tab[aria-expanded="true"] {
+  color: #fff;
+}
+
+/* --- Popover menus (Rounds, More) ---
+   A small white card that floats just above the tab bar. It's placed
+   with position: fixed relative to the screen; js/nav.js sets its
+   horizontal position to line up with the tab that opened it. The
+   `hidden` attribute hides it until it's opened. */
+.tab-popover {
+  position: fixed;
+  z-index: 101;   /* above the bar */
+  bottom: calc(var(--tabbar-height) + env(safe-area-inset-bottom) + var(--space-2));
+  min-width: 160px;
+  padding: var(--space-1) 0;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  box-shadow: 0 8px 24px rgba(11, 31, 58, 0.22);
+}
+
+.tab-popover[hidden] {
+  display: none;
+}
+
+.tab-popover a {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 var(--space-4);
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 1.1rem;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--navy);
+  text-decoration: none;
+}
+
+.tab-popover a:hover {
+  background: var(--bg);
+}
+
+/* The page you're on inside a popover (e.g. "Round 2" while on round2). */
+.tab-popover a.is-active {
+  color: var(--eu);
+  box-shadow: inset 3px 0 0 var(--eu);   /* thin left bar, no layout shift */
 }
