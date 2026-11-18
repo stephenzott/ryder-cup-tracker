@@ -1,13 +1,22 @@
-// Individual player card: ?id=<playerId> in the URL. Pulls the same
-// live match data every other page uses and runs it through
-// player-stats.js's shared computation, so these numbers always match
-// what's shown on the stats page.
+// Individual player card, for anyone who has ever played.
 //
-// Layout: a navy header (initials, name, handicap, and a
-// "2027 · Team USA" pill -- teams are redrawn every year, so the team
-// is shown as this year's, not as who the player is), stat tiles, then
-// one card per match this year with the shared match pieces (status,
-// sides, front/back/overall, hole grid).
+// Address: player.html?p=<slug>, e.g. ?p=keanan-smith (see personSlug in
+// player-stats.js). The person is found by name, so the same link works
+// every year, even for someone who skips a year and gets a new Firestore
+// ID when they come back. Older links of the form ?id=<Firestore ID>
+// still work: the page looks that ID up on the roster and quietly
+// rewrites the address to the ?p= form.
+//
+// Layout:
+//   1. Navy header. On this year's roster: initials, name, handicap and
+//      a "2027 · Team USA" pill (teams are redrawn every year, so the
+//      team is labeled as this year's). Not on the roster: initials,
+//      name and "Played: 2026".
+//   2. All-time stat tiles: every past trip plus this year, from
+//      computeCareerStats, the same numbers as the Stats page's
+//      All-time tab.
+//   3. One card per match THIS year, with the shared match pieces
+//      (status, sides, front/back/overall, hole grid).
 
 import { db } from "./firebase-init.js";
 import {
@@ -15,7 +24,8 @@ import {
   onSnapshot,
 } from "https://www.gstatic.com/firebasejs/11.3.1/firebase-firestore.js";
 import { ROUNDS } from "./rounds-config.js";
-import { computePlayerStats, playerLink, formatToPar } from "./player-stats.js";
+import { computeCareerStats, personSlug, playerLink, formatToPar } from "./player-stats.js";
+import { PAST_TRIPS } from "./history-data.js";
 import { scoreMatch } from "./scoring.js";
 import {
   formatPoints,
@@ -29,7 +39,10 @@ import {
 } from "./match-ui.js";
 
 const app = document.getElementById("app");
-const playerId = new URLSearchParams(location.search).get("id");
+// The two address forms: ?p=<slug> (normal) or ?id=<Firestore ID> (old).
+const params = new URLSearchParams(location.search);
+let slug = params.get("p");
+const legacyId = params.get("id");
 
 // "Not found" page, used for a missing ?id= and for an id that isn't on
 // the roster.
@@ -121,37 +134,73 @@ function render() {
     app.innerHTML = SKELETON_PAGE;
     return;
   }
-  const player = players.find((p) => p.id === playerId);
-  if (!player) {
-    notFound("There's no player with this link on the roster.");
-    return;
+  // An old ?id= link: find that roster player and switch the address
+  // to their ?p= link. replaceState changes the address bar without
+  // reloading the page or adding a Back-button step.
+  if (!slug) {
+    const byId = players.find((p) => p.id === legacyId);
+    if (!byId) {
+      notFound("There's no player with this link on the roster.");
+      return;
+    }
+    slug = personSlug(byId.name);
+    history.replaceState(null, "", `player.html?p=${slug}`);
   }
 
-  const stats = computePlayerStats(playerId, matchesByRound);
-  const { record } = stats;
+  // Who is this? Their record on this year's roster (if any) and/or
+  // their entries on past trips. Either one is enough for a card.
+  const rosterPlayer = players.find((p) => personSlug(p.name) === slug) || null;
+  const pastEntry = PAST_TRIPS.flatMap((t) => t.players).find((p) => personSlug(p.fullName) === slug);
+  if (!rosterPlayer && !pastEntry) {
+    notFound("No one by this name has played on a trip yet.");
+    return;
+  }
+  const fullName = rosterPlayer ? rosterPlayer.name : pastEntry.fullName;
+  document.title = `${fullName} — Ryder Cup Trip`;
 
-  const roundsHtml = stats.roundDetails.length
-    ? stats.roundDetails.map(roundCardHtml).join("")
-    : `<p class="sb-empty">Hasn't played a match yet this year.</p>`;
+  const career = computeCareerStats(fullName, rosterPlayer, matchesByRound);
+  const { record } = career;
+  const years = [...career.pastYears, ...(career.playedThisYear ? [CURRENT_YEAR] : [])];
+
+  // Header details: handicap + this year's team if on the roster,
+  // otherwise which years they played.
+  const heroSub = rosterPlayer
+    ? `Handicap index ${rosterPlayer.handicapIndex ?? "—"}`
+    : `Played: ${years.join(", ")}`;
+  const heroPill = rosterPlayer ? `<div class="player-hero-pill">${teamPillHtml(rosterPlayer.team)}</div>` : "";
+
+  // The record tile shows "—" until every past trip they played has its
+  // record entered in history-data.js.
+  const recordValue = record ? `${record.wins}-${record.losses}-${record.halves}` : "—";
+  const recordNote = record ? "W-L-H, per nine &amp; overall" : "Past records not entered yet";
+  const pctValue = career.pctOf > 0 ? `${Math.round((career.pctPoints / career.pctOf) * 100)}%` : "—";
+
+  // This year's matches. Only roster players can have any.
+  let roundsHtml;
+  if (!rosterPlayer) roundsHtml = `<p class="sb-empty">Not on the ${CURRENT_YEAR} roster.</p>`;
+  else if (career.live.roundDetails.length === 0) roundsHtml = `<p class="sb-empty">Hasn't played a match yet this year.</p>`;
+  else roundsHtml = career.live.roundDetails.map(roundCardHtml).join("");
 
   app.innerHTML = `
     <header class="page-header">
       <div class="player-hero">
-        ${avatarHtml(player.name, null, "lg")}
+        ${avatarHtml(fullName, null, "lg")}
         <div class="player-hero-text">
-          <h1 class="page-title">${player.name}</h1>
-          <p class="page-sub">Handicap index ${player.handicapIndex ?? "—"}</p>
+          <h1 class="page-title">${fullName}</h1>
+          <p class="page-sub">${heroSub}</p>
         </div>
       </div>
-      <div class="player-hero-pill">${teamPillHtml(player.team)}</div>
+      ${heroPill}
     </header>
 
-    <section class="stat-tiles" aria-label="${CURRENT_YEAR} stats">
-      ${tileHtml("Points", formatPoints(stats.points))}
-      ${tileHtml("Record", `${record.wins}-${record.losses}-${record.halves}`, "W-L-H, per nine &amp; overall")}
-      ${tileHtml("Avg score", stats.avgScore == null ? "—" : stats.avgScore.toFixed(1))}
-      ${tileHtml("Best round", stats.bestRound == null ? "—" : formatToPar(stats.bestRound))}
-      ${tileHtml("Birdies", stats.birdies, "or better")}
+    <h2 class="section-title">All-time</h2>
+    <section class="stat-tiles" aria-label="All-time stats">
+      ${tileHtml("Points", formatPoints(career.points))}
+      ${tileHtml("Pct", pctValue, "finished matches")}
+      ${tileHtml("Record", recordValue, recordNote)}
+      ${tileHtml("Avg score", career.avgScore == null ? "—" : career.avgScore.toFixed(1))}
+      ${tileHtml("Best round", career.bestRound == null ? "—" : formatToPar(career.bestRound))}
+      ${tileHtml("Birdies", career.birdies, "or better")}
     </section>
 
     <h2 class="section-title">${CURRENT_YEAR} matches</h2>
@@ -159,7 +208,7 @@ function render() {
   `;
 }
 
-if (!playerId) {
+if (!slug && !legacyId) {
   notFound("This page needs a player link (it opens from the roster or stats pages).");
 } else {
   render();

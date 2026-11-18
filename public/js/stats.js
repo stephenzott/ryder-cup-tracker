@@ -14,7 +14,8 @@
 //
 // All the actual computation lives in player-stats.js (live year) and
 // history-data.js (frozen past years), shared with the player card
-// page so numbers never disagree between pages.
+// page so numbers never disagree between pages. The All-time tab and
+// the player card's all-time tiles both use computeCareerStats.
 //
 // Team colors: teams are redrawn every year, so a row is colored by
 // the team for the year that tab shows -- this year's team on the
@@ -27,7 +28,14 @@ import {
   onSnapshot,
 } from "https://www.gstatic.com/firebasejs/11.3.1/firebase-firestore.js";
 import { ROUNDS } from "./rounds-config.js";
-import { computePlayerStats, firstName, playerLink, formatToPar } from "./player-stats.js";
+import {
+  computePlayerStats,
+  computeCareerStats,
+  allPeople,
+  shortNames,
+  personLink,
+  formatToPar,
+} from "./player-stats.js";
 import { PAST_TRIPS } from "./history-data.js";
 import { formatPoints, avatarHtml, CURRENT_YEAR } from "./match-ui.js";
 
@@ -284,127 +292,76 @@ const roundsLoaded = new Set();
 // Rows for each tab
 // ------------------------------------------------------------------
 
+// Names in every table: first names, or "Sean O." / "Sean K." when two
+// people in the same table share a first name (shortNames in
+// player-stats.js). Every name links to that person's card by name,
+// player.html?p=<slug>, which works whether or not they're on this
+// year's roster.
+
 // This year, live. Colored by this year's team.
 function currentRows() {
-  return players
-    .map((p) => ({ player: p, stats: computePlayerStats(p.id, matchesByRound) }))
-    .sort((a, b) => b.stats.points - a.stats.points || (a.stats.avgScore ?? 999) - (b.stats.avgScore ?? 999))
-    .map(({ player, stats }) => ({
+  const short = shortNames(players.map((p) => p.name));
+  return players.map((player) => {
+    const stats = computePlayerStats(player.id, matchesByRound);
+    const name = short.get(player.name);
+    return {
       team: player.team,
       avatarName: player.name,
-      nameHtml: playerLink(player.id, firstName(player.name)),
-      sortName: firstName(player.name),
+      nameHtml: personLink(player.name, name),
+      sortName: name,
       avgScore: stats.avgScore,
       points: stats.points,
       ...finishedMatchPoints(stats.roundDetails),
       birdies: stats.birdies,
       bestRound: stats.bestRound,
-    }));
+    };
+  });
 }
 
-// Builds the "All-Time" rows: every current roster player's live
-// numbers, plus (summed in) any past-trip entry for that same
-// playerId -- and, separately, any past player who never matched to a
-// current roster id (e.g. Keanan from the 2026 trip, shown by his fullName), kept in by name
-// since they have no live portion to anchor to. Neutral color (team:
-// null) because these rows mix years with different teams.
+// All-time: everyone who has ever played (this year's roster plus past
+// players not on it), each with their past trips and this year added
+// together by computeCareerStats -- the same function the player card
+// uses. Neutral color (team: null) because these rows mix years with
+// different teams.
 function careerRows() {
-  const rosterIds = new Set(players.map((p) => p.id));
-  const rows = [];
-
-  for (const player of players) {
-    const live = computePlayerStats(player.id, matchesByRound);
-    const liveComplete = live.roundDetails.filter((d) => d.total != null);
-
-    let totalStrokes = liveComplete.reduce((sum, d) => sum + d.total, 0);
-    let roundsPlayed = liveComplete.length;
-    let points = live.points;
-    let birdies = live.birdies;
-    let bestRound = live.bestRound;
-    let { pctPoints, pctOf } = finishedMatchPoints(live.roundDetails);
-
-    for (const trip of PAST_TRIPS) {
-      const entry = trip.players.find((p) => p.playerId === player.id);
-      if (!entry) continue;
-      totalStrokes += entry.totalStrokes;
-      roundsPlayed += entry.roundsPlayed;
-      points += entry.points;
-      birdies += entry.birdies;
-      bestRound = bestRound == null ? entry.bestRound : Math.min(bestRound, entry.bestRound);
-      pctPoints += entry.points;
-      pctOf += entry.roundsPlayed * 3;
-    }
-
-    rows.push({
+  const people = allPeople(players);
+  const short = shortNames(people.map((p) => p.fullName));
+  return people.map(({ fullName, rosterPlayer }) => {
+    const career = computeCareerStats(fullName, rosterPlayer, matchesByRound);
+    const name = short.get(fullName);
+    return {
       team: null,
-      avatarName: player.name,
-      nameHtml: playerLink(player.id, firstName(player.name)),
-      sortName: firstName(player.name),
-      avgScore: roundsPlayed > 0 ? totalStrokes / roundsPlayed : null,
-      points,
-      pctPoints,
-      pctOf,
-      birdies,
-      bestRound,
-    });
-  }
-
-  // name -> running totals, for past players with no current-roster match.
-  const unmatched = {};
-  for (const trip of PAST_TRIPS) {
-    for (const entry of trip.players) {
-      if (entry.playerId && rosterIds.has(entry.playerId)) continue; // already folded in above
-      const acc = unmatched[entry.name] || {
-        displayName: entry.fullName || entry.name,   // e.g. "Keanan Smith"
-        totalStrokes: 0,
-        roundsPlayed: 0,
-        points: 0,
-        birdies: 0,
-        bestRound: null,
-      };
-      acc.totalStrokes += entry.totalStrokes;
-      acc.roundsPlayed += entry.roundsPlayed;
-      acc.points += entry.points;
-      acc.pctOf = (acc.pctOf || 0) + entry.roundsPlayed * 3;
-      acc.birdies += entry.birdies;
-      acc.bestRound = acc.bestRound == null ? entry.bestRound : Math.min(acc.bestRound, entry.bestRound);
-      unmatched[entry.name] = acc;
-    }
-  }
-  for (const acc of Object.values(unmatched)) {
-    rows.push({
-      team: null,
-      avatarName: acc.displayName,
-      nameHtml: acc.displayName,
-      sortName: acc.displayName,
-      avgScore: acc.roundsPlayed > 0 ? acc.totalStrokes / acc.roundsPlayed : null,
-      points: acc.points,
-      pctPoints: acc.points,
-      pctOf: acc.pctOf,
-      birdies: acc.birdies,
-      bestRound: acc.bestRound,
-    });
-  }
-
-  rows.sort((a, b) => b.points - a.points || (a.avgScore ?? 999) - (b.avgScore ?? 999));
-  return rows;
+      avatarName: fullName,
+      nameHtml: personLink(fullName, name),
+      sortName: name,
+      avgScore: career.avgScore,
+      points: career.points,
+      pctPoints: career.pctPoints,
+      pctOf: career.pctOf,
+      birdies: career.birdies,
+      bestRound: career.bestRound,
+    };
+  });
 }
 
 // The last past trip, frozen. Colored by each player's team ON THAT TRIP.
-// Kept in the order stored in history-data.js (already final standings).
 function lastTripRows() {
-  return lastTrip.players.map((p) => ({
-    team: p.team,
-    avatarName: p.name,
-    nameHtml: p.playerId ? playerLink(p.playerId, p.name) : p.name,
-    sortName: p.name,
-    avgScore: p.roundsPlayed > 0 ? p.totalStrokes / p.roundsPlayed : null,
-    points: p.points,
-    pctPoints: p.points,
-    pctOf: p.roundsPlayed * 3,   // 3 points per round played (4 rounds = 12)
-    birdies: p.birdies,
-    bestRound: p.bestRound,
-  }));
+  const short = shortNames(lastTrip.players.map((p) => p.fullName));
+  return lastTrip.players.map((p) => {
+    const name = short.get(p.fullName);
+    return {
+      team: p.team,
+      avatarName: p.fullName,
+      nameHtml: personLink(p.fullName, name),
+      sortName: name,
+      avgScore: p.roundsPlayed > 0 ? p.totalStrokes / p.roundsPlayed : null,
+      points: p.points,
+      pctPoints: p.points,
+      pctOf: p.roundsPlayed * 3,   // 3 points per round played (4 rounds = 12)
+      birdies: p.birdies,
+      bestRound: p.bestRound,
+    };
+  });
 }
 
 // ------------------------------------------------------------------
