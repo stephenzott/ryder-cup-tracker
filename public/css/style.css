@@ -2686,7 +2686,7 @@ table.leaderboard {
 
 .leaderboard th,
 .leaderboard td {
-  padding: 0 6px;
+  padding: 0 5px;
   height: 44px;
 }
 
@@ -2706,12 +2706,22 @@ table.leaderboard {
   color: var(--muted);
 }
 
+/* Avatar and name side by side; a long name ("Keanan Smith") wraps
+   onto a second line next to the circle instead of widening the table
+   (a flex row keeps the wrapped name beside the avatar, not under it). */
 .lb-player {
-  white-space: nowrap;
+  white-space: normal;
+}
+
+.lb-player-inner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
 }
 
 .lb-name {
-  margin-left: var(--space-2);
+  line-height: 1.15;
+  overflow-wrap: anywhere;
 }
 
 /* Name links fill the row height so they're easy to tap. */

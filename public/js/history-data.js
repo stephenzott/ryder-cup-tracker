@@ -13,8 +13,8 @@
 //
 // `playerId` links a name to that person's current player.html card
 // when they're still on this year's roster -- null means either they
-// aren't on the current roster, or (Keanan) there wasn't a confident
-// match to make.
+// aren't on the current roster, or (Keanan Smith) there wasn't a
+// confident match to make.
 //
 // PAST_TRIPS is a list so future years just add another entry: once
 // the 2027 trip wraps, freeze its numbers the same way into a
@@ -26,7 +26,7 @@ export const HISTORY_2026 = {
   players: [
     { name: "Doug", team: "europe", totalStrokes: 331, roundsPlayed: 4, points: 9.0, birdies: 4, bestRound: 2, playerId: "0YuSXaeGccvkYNvgrPOl" },
     { name: "Will", team: "europe", totalStrokes: 336, roundsPlayed: 4, points: 8.5, birdies: 5, bestRound: 6, playerId: "FekEeWoWl9oQeOrKxrIh" },
-    { name: "Keanan", team: "europe", totalStrokes: 354, roundsPlayed: 4, points: 7.5, birdies: 2, bestRound: 7, playerId: null },
+    { name: "Keanan Smith", team: "europe", totalStrokes: 354, roundsPlayed: 4, points: 7.5, birdies: 2, bestRound: 7, playerId: null },
     { name: "Chris", team: "usa", totalStrokes: 345, roundsPlayed: 4, points: 7.0, birdies: 4, bestRound: 10, playerId: "IdcW38IokTn8O0hbECip" },
     { name: "Bennett", team: "usa", totalStrokes: 362, roundsPlayed: 4, points: 6.5, birdies: 2, bestRound: 10, playerId: "LrGzM4VMCECwlW1hyey1" },
     { name: "Stephen", team: "usa", totalStrokes: 334, roundsPlayed: 4, points: 6.0, birdies: 4, bestRound: 10, playerId: "FytfkAhCwnLsFdi2bFQi" },

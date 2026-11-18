@@ -1,11 +1,16 @@
-// The Stats page: three leaderboards behind tabs.
+// The Stats page: three leaderboards behind tabs, in this order.
 //   1. "2027"     -- this year only, live.
-//   2. "All-time" -- every past trip's frozen numbers plus this year's
+//   2. "2026"     -- the most recent *past* trip alone, frozen.
+//   3. "All-time" -- every past trip's frozen numbers plus this year's
 //                    live numbers, added together. Live too, since the
 //                    current-year portion still updates as scores come in.
-//   3. "2026"     -- the most recent *past* trip alone, frozen.
-//      (Each entry in PAST_TRIPS gets a tab, newest last, so a frozen
-//      2027 added next year simply becomes another tab.)
+//
+// "Pct" (points percentage) = points won in FINISHED matches divided by
+// the points those matches were worth (3 each: front 9, back 9,
+// overall). A match still being played doesn't count at all -- not even
+// a front nine already won -- until all 18 holes are in. Past trips
+// only store final totals, so for them it's points / (rounds x 3),
+// e.g. 9 of 12 = 75% for 2026.
 //
 // All the actual computation lives in player-stats.js (live year) and
 // history-data.js (frozen past years), shared with the player card
@@ -42,14 +47,14 @@ const TABS = [
     note: `This year, live. Sorted by points earned. "—" means not enough data yet (a stat only counts a round once all 18 holes are in). Tap a name for their full card.`,
   },
   {
-    id: "alltime",
-    label: "All-time",
-    note: `This year's live numbers added to every past trip's frozen ones. A player with no past-trip data just shows this year's numbers. Teams change every year, so no team colors here.`,
-  },
-  {
     id: shortTripLabel(lastTrip),
     label: shortTripLabel(lastTrip),
     note: `${lastTrip.label}: that trip's final stats, frozen. Colors show each player's team on that trip. Same columns and scoring rules as the other tabs.`,
+  },
+  {
+    id: "alltime",
+    label: "All-time",
+    note: `This year's live numbers added to every past trip's frozen ones. A player with no past-trip data just shows this year's numbers. Teams change every year, so no team colors here.`,
   },
 ];
 
@@ -62,7 +67,8 @@ let selectedTab = tabFromHash() || TABS[0].id;
 // ------------------------------------------------------------------
 // Leaderboard table. Every tab uses the same builder, so the columns,
 // the "—" for missing data and the ½ formatting can't drift apart.
-// A row: { team, avatarName, nameHtml, avgScore, points, birdies, bestRound }
+// A row: { team, avatarName, nameHtml, avgScore, points, pctPoints,
+//         pctOf, birdies, bestRound }   (pct = pctPoints / pctOf)
 //   team = "A"/"B"/"usa"/"europe" to color the initials circle, or null
 //   for neutral navy.
 // ------------------------------------------------------------------
@@ -82,6 +88,22 @@ function ranks(rows) {
   });
 }
 
+// Points percentage as a whole number, e.g. "75%"; "—" until the
+// player has finished at least one match.
+function formatPct(points, outOf) {
+  return outOf > 0 ? `${Math.round((points / outOf) * 100)}%` : "—";
+}
+
+// From a player's live roundDetails (computePlayerStats), the points
+// won in FINISHED matches and what those matches were worth (3 each).
+function finishedMatchPoints(roundDetails) {
+  const finished = roundDetails.filter((d) => d.overall.complete);
+  return {
+    pctPoints: finished.reduce((sum, d) => sum + d.points, 0),
+    pctOf: finished.length * 3,
+  };
+}
+
 function leaderboardHtml(rows) {
   if (rows.length === 0) return `<p class="sb-empty">No players yet.</p>`;
   const rankLabels = ranks(rows);
@@ -90,8 +112,9 @@ function leaderboardHtml(rows) {
       (r, i) => `
         <tr>
           <td class="lb-rank">${rankLabels[i]}</td>
-          <td class="lb-player">${avatarHtml(r.avatarName, r.team)}<span class="lb-name">${r.nameHtml}</span></td>
+          <td class="lb-player"><span class="lb-player-inner">${avatarHtml(r.avatarName, r.team)}<span class="lb-name">${r.nameHtml}</span></span></td>
           <td class="lb-num lb-pts">${formatPoints(r.points)}</td>
+          <td class="lb-num">${formatPct(r.pctPoints, r.pctOf)}</td>
           <td class="lb-num">${r.avgScore == null ? "—" : r.avgScore.toFixed(1)}</td>
           <td class="lb-num">${r.birdies}</td>
           <td class="lb-num">${r.bestRound == null ? "—" : formatToPar(r.bestRound)}</td>
@@ -109,6 +132,7 @@ function leaderboardHtml(rows) {
             <th class="lb-rank" scope="col"><abbr title="Rank">#</abbr></th>
             <th scope="col">Player</th>
             <th class="lb-num" scope="col"><abbr title="Points">Pts</abbr></th>
+            <th class="lb-num" scope="col"><abbr title="Points percentage, finished matches">Pct</abbr></th>
             <th class="lb-num" scope="col"><abbr title="Average score">Avg</abbr></th>
             <th class="lb-num" scope="col"><abbr title="Birdies or better">Bir</abbr></th>
             <th class="lb-num" scope="col"><abbr title="Best round versus par">Best</abbr></th>
@@ -117,7 +141,7 @@ function leaderboardHtml(rows) {
         <tbody>${body}</tbody>
       </table>
     </div>
-    <p class="lb-key">Pts = points · Avg = average 18-hole score · Bir = birdies or better · Best = best round vs par</p>
+    <p class="lb-key">Pts = points · Pct = share of points won in finished matches · Avg = average 18-hole score · Bir = birdies or better · Best = best round vs par</p>
   `;
 }
 
@@ -166,6 +190,7 @@ function currentRows() {
       nameHtml: playerLink(player.id, firstName(player.name)),
       avgScore: stats.avgScore,
       points: stats.points,
+      ...finishedMatchPoints(stats.roundDetails),
       birdies: stats.birdies,
       bestRound: stats.bestRound,
     }));
@@ -174,7 +199,7 @@ function currentRows() {
 // Builds the "All-Time" rows: every current roster player's live
 // numbers, plus (summed in) any past-trip entry for that same
 // playerId -- and, separately, any past player who never matched to a
-// current roster id (e.g. Keanan from the 2026 trip), kept in by name
+// current roster id (e.g. Keanan Smith from the 2026 trip), kept in by name
 // since they have no live portion to anchor to. Neutral color (team:
 // null) because these rows mix years with different teams.
 function careerRows() {
@@ -190,6 +215,7 @@ function careerRows() {
     let points = live.points;
     let birdies = live.birdies;
     let bestRound = live.bestRound;
+    let { pctPoints, pctOf } = finishedMatchPoints(live.roundDetails);
 
     for (const trip of PAST_TRIPS) {
       const entry = trip.players.find((p) => p.playerId === player.id);
@@ -199,6 +225,8 @@ function careerRows() {
       points += entry.points;
       birdies += entry.birdies;
       bestRound = bestRound == null ? entry.bestRound : Math.min(bestRound, entry.bestRound);
+      pctPoints += entry.points;
+      pctOf += entry.roundsPlayed * 3;
     }
 
     rows.push({
@@ -207,6 +235,8 @@ function careerRows() {
       nameHtml: playerLink(player.id, firstName(player.name)),
       avgScore: roundsPlayed > 0 ? totalStrokes / roundsPlayed : null,
       points,
+      pctPoints,
+      pctOf,
       birdies,
       bestRound,
     });
@@ -227,6 +257,7 @@ function careerRows() {
       acc.totalStrokes += entry.totalStrokes;
       acc.roundsPlayed += entry.roundsPlayed;
       acc.points += entry.points;
+      acc.pctOf = (acc.pctOf || 0) + entry.roundsPlayed * 3;
       acc.birdies += entry.birdies;
       acc.bestRound = acc.bestRound == null ? entry.bestRound : Math.min(acc.bestRound, entry.bestRound);
       unmatched[entry.name] = acc;
@@ -239,6 +270,8 @@ function careerRows() {
       nameHtml: name,
       avgScore: acc.roundsPlayed > 0 ? acc.totalStrokes / acc.roundsPlayed : null,
       points: acc.points,
+      pctPoints: acc.points,
+      pctOf: acc.pctOf,
       birdies: acc.birdies,
       bestRound: acc.bestRound,
     });
@@ -257,6 +290,8 @@ function lastTripRows() {
     nameHtml: p.playerId ? playerLink(p.playerId, p.name) : p.name,
     avgScore: p.roundsPlayed > 0 ? p.totalStrokes / p.roundsPlayed : null,
     points: p.points,
+    pctPoints: p.points,
+    pctOf: p.roundsPlayed * 3,   // 3 points per round played (4 rounds = 12)
     birdies: p.birdies,
     bestRound: p.bestRound,
   }));
