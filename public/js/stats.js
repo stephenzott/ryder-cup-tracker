@@ -199,7 +199,7 @@ function currentRows() {
 // Builds the "All-Time" rows: every current roster player's live
 // numbers, plus (summed in) any past-trip entry for that same
 // playerId -- and, separately, any past player who never matched to a
-// current roster id (e.g. Keanan Smith from the 2026 trip), kept in by name
+// current roster id (e.g. Keanan from the 2026 trip, shown by his fullName), kept in by name
 // since they have no live portion to anchor to. Neutral color (team:
 // null) because these rows mix years with different teams.
 function careerRows() {
@@ -248,6 +248,7 @@ function careerRows() {
     for (const entry of trip.players) {
       if (entry.playerId && rosterIds.has(entry.playerId)) continue; // already folded in above
       const acc = unmatched[entry.name] || {
+        displayName: entry.fullName || entry.name,   // e.g. "Keanan Smith"
         totalStrokes: 0,
         roundsPlayed: 0,
         points: 0,
@@ -263,11 +264,11 @@ function careerRows() {
       unmatched[entry.name] = acc;
     }
   }
-  for (const [name, acc] of Object.entries(unmatched)) {
+  for (const acc of Object.values(unmatched)) {
     rows.push({
       team: null,
-      avatarName: name,
-      nameHtml: name,
+      avatarName: acc.displayName,
+      nameHtml: acc.displayName,
       avgScore: acc.roundsPlayed > 0 ? acc.totalStrokes / acc.roundsPlayed : null,
       points: acc.points,
       pctPoints: acc.points,
