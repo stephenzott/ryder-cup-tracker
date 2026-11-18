@@ -5,7 +5,7 @@
 // writes the made-up data in ./state.js instead of the real database.
 // Saves therefore work, but only inside this browser tab.
 
-import { ready, getState, persist } from "./state.js";
+import { ready, getState, persist, playNextHoleSomewhere } from "./state.js";
 
 // A "reference" is just the path, e.g. "rounds/round3/matches".
 export function collection(db, ...segments) {
@@ -104,4 +104,19 @@ export async function deleteDoc(ref) {
   if (parts[0] === "players") state.players = state.players.filter((p) => p.id !== parts[1]);
   else delete state.rounds[parts[1]][parts[3]];
   notifyAll();
+}
+
+// "Live" demo: every `seconds`, another group finishes a hole and every
+// listener on the page gets the update, exactly as if it came from
+// another phone through Firestore. Returns a function that stops it.
+// `onTick` receives a short description of what happened (or null
+// once every other match has finished).
+export function startLiveSimulation(seconds, onTick) {
+  const timer = setInterval(() => {
+    const what = playNextHoleSomewhere();
+    if (what) notifyAll();
+    onTick?.(what);
+    if (!what) clearInterval(timer);
+  }, seconds * 1000);
+  return () => clearInterval(timer);
 }

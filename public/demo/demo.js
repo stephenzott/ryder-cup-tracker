@@ -23,7 +23,13 @@ import {
   SCENARIOS,
   setYou,
   resetAll,
+  isLivePaused,
+  setLivePaused,
 } from "./state.js";
+import { startLiveSimulation } from "./fake-firestore.js";
+
+// How often another group finishes a hole in the "live" demo.
+const LIVE_SECONDS = 20;
 
 const DEMO_PAGES = ["index", "scoreboard", ...ROUNDS.map((r) => r.id)];
 
@@ -81,6 +87,11 @@ function demoBarHtml(state) {
         <label>You are (demo teams)
           <select id="demo-you">${byTeam("A", "Team USA")}${byTeam("B", "Team EU")}</select>
         </label>
+        <!-- Live updates: only in the "play" scenario. -->
+        <div class="demo-live-row"${scenario === "play" ? "" : " hidden"}>
+          <span id="demo-live-status">${isLivePaused() ? "Live updates paused" : `Live: another group finishes a hole every ${LIVE_SECONDS} s`}</span>
+          <button type="button" class="secondary" id="demo-live-toggle">${isLivePaused() ? "Resume" : "Pause"}</button>
+        </div>
         <button type="button" class="secondary" id="demo-reset">Reset demo</button>
       </div>
     </details>
@@ -126,6 +137,30 @@ async function start() {
   document.getElementById("demo-reset").addEventListener("click", () => {
     resetAll();
     location.href = "demo.html";
+  });
+
+  // Live updates (play scenario): run the timer unless paused. The
+  // status line shows the latest update, e.g. "Match 3 finished hole 9".
+  let stopLive = null;
+  const statusEl = document.getElementById("demo-live-status");
+  const toggleEl = document.getElementById("demo-live-toggle");
+  const startLive = () => {
+    stopLive = startLiveSimulation(LIVE_SECONDS, (what) => {
+      statusEl.textContent = what ? `Live: ${what}` : "Live: every other match has finished";
+    });
+  };
+  if (currentScenario() === "play" && !isLivePaused()) startLive();
+  toggleEl.addEventListener("click", () => {
+    const pausing = !isLivePaused();
+    setLivePaused(pausing);
+    if (pausing) {
+      stopLive?.();
+      statusEl.textContent = "Live updates paused";
+    } else {
+      startLive();
+      statusEl.textContent = `Live: another group finishes a hole every ${LIVE_SECONDS} s`;
+    }
+    toggleEl.textContent = pausing ? "Resume" : "Pause";
   });
 
   // Now run the tab bar and the page's own script, exactly as the real

@@ -271,6 +271,45 @@ export function setYou(playerId) {
   save();
 }
 
+// ------------------------------------------------------------------
+// "Live" simulation (play scenario only): another group finishes a
+// hole. Picks a random match in the round in progress -- never yours,
+// never one that's finished -- and adds made-up scores for its next
+// hole. Returns a short description, or null if every other match is
+// done. The caller (fake-firestore.js) then tells the page.
+// ------------------------------------------------------------------
+export function playNextHoleSomewhere() {
+  const roundId = state.liveRoundId;
+  const round = ROUNDS.find((r) => r.id === roundId);
+  const course = COURSES[roundId];
+  const candidates = Object.entries(state.rounds[roundId] || {}).filter(([, m]) => {
+    const mine = [...(m.sideA || []), ...(m.sideB || [])].includes(state.you);
+    return !mine && Object.keys(m.holes || {}).length < 18;
+  });
+  if (candidates.length === 0) return null;
+
+  const [matchId, match] = candidates[Math.floor(Math.random() * candidates.length)];
+  match.holes = match.holes || {};
+  const next = Object.keys(match.holes).length + 1;
+  const par = course.holes[next - 1].par;
+  const random = Math.random;
+  match.holes[next] =
+    round.holeShape === "perPlayer"
+      ? { a: match.sideA.map(() => holeScore(par, random)), b: match.sideB.map(() => holeScore(par, random)) }
+      : { a: holeScore(par, random), b: holeScore(par, random) };
+  save();
+  return `${matchId.replace("match", "Match ")} finished hole ${next}`;
+}
+
+export function isLivePaused() {
+  return Boolean(state.livePaused);
+}
+
+export function setLivePaused(paused) {
+  state.livePaused = paused;
+  save();
+}
+
 export function resetAll() {
   try {
     sessionStorage.removeItem(STORAGE_KEY);
