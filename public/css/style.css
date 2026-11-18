@@ -2698,6 +2698,62 @@ table.leaderboard {
   text-decoration: none;   /* the key under the table explains them */
 }
 
+/* --- Sortable column headings (stats page) ---
+   Each heading is a <button> so it works with a tap, a mouse or the
+   keyboard (using a real button rather than a clickable <th> is the
+   standard accessibility practice). The header row grows from 36px to
+   44px so every heading is a full-size tap target. */
+.leaderboard th.lb-sortable {
+  height: 44px;
+  padding: 0;   /* the button carries the padding, so all of it is tappable */
+}
+
+/* Undo the site's filled navy button look: a heading button should
+   look like plain heading text and fill its whole cell. */
+.leaderboard .lb-sort {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 44px;
+  padding: 0 5px;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;           /* same font, size, caps and spacing as th */
+  letter-spacing: inherit;
+  text-transform: inherit;
+  white-space: nowrap;
+}
+
+/* Number columns are right-aligned, so their heading content is pushed
+   to the right edge to line up with the numbers. */
+.leaderboard th.lb-num .lb-sort {
+  justify-content: flex-end;
+}
+
+.leaderboard .lb-sort:hover {
+  background: transparent;
+  color: var(--navy);
+}
+
+/* The sorted column's heading turns navy (general UI color, never a
+   team color) so it's clear which column is in charge. */
+.leaderboard th.is-sorted {
+  color: var(--navy);
+}
+
+/* The ▲/▼ arrow. Its width is reserved on every heading, even when
+   empty, so the columns don't jump sideways when you sort a different
+   one. */
+.lb-sort-arrow {
+  display: inline-block;
+  width: 0.8em;
+  font-size: 0.6rem;
+  text-align: center;
+  flex-shrink: 0;
+}
+
 .lb-rank {
   width: 2.4em;
   text-align: center;

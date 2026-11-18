@@ -44,7 +44,7 @@ const TABS = [
   {
     id: String(CURRENT_YEAR),
     label: String(CURRENT_YEAR),
-    note: `This year, live. Sorted by points earned. "—" means not enough data yet (a stat only counts a round once all 18 holes are in). Tap a name for their full card.`,
+    note: `This year, live. Tap a column heading to sort by it. "—" means not enough data yet (a stat only counts a round once all 18 holes are in). Tap a name for their full card.`,
   },
   {
     id: shortTripLabel(lastTrip),
@@ -67,25 +67,135 @@ let selectedTab = tabFromHash() || TABS[0].id;
 // ------------------------------------------------------------------
 // Leaderboard table. Every tab uses the same builder, so the columns,
 // the "—" for missing data and the ½ formatting can't drift apart.
-// A row: { team, avatarName, nameHtml, avgScore, points, pctPoints,
-//         pctOf, birdies, bestRound }   (pct = pctPoints / pctOf)
+// A row: { team, avatarName, nameHtml, sortName, avgScore, points,
+//         pctPoints, pctOf, birdies, bestRound }   (pct = pctPoints / pctOf)
+//   sortName = the name as plain text (nameHtml may be a link), for A-to-Z.
 //   team = "A"/"B"/"usa"/"europe" to color the initials circle, or null
 //   for neutral navy.
 // ------------------------------------------------------------------
 
-// Rank numbers with ties: rows with the same points AND average share a
-// rank, shown as "T2". (Rows arrive already sorted.)
-function ranks(rows) {
-  const out = [];
-  rows.forEach((row, i) => {
-    const prev = rows[i - 1];
-    const tiedWithPrev = prev && prev.points === row.points && prev.avgScore === row.avgScore;
-    out.push(tiedWithPrev ? out[i - 1] : i + 1);
+// ------------------------------------------------------------------
+// Sortable columns. Tapping a heading sorts by that column, "best
+// first" (the leader on top); tapping the same heading again flips
+// it. The choice is shared by all three tabs and resets on reload,
+// since it lives in a plain variable, not in storage.
+//
+// Each column says how to read its value off a row (value), whether a
+// bigger or smaller value is better (better), and its heading text.
+// A value of null means "no data yet" ("—" in the table); those rows
+// always go to the bottom, whichever way the column is sorted.
+// ------------------------------------------------------------------
+const COLUMNS = [
+  { key: "name",    label: "Player", title: null,                                  better: "low",  value: (r) => r.sortName.toLowerCase() },
+  { key: "points",  label: "Pts",    title: "Points",                              better: "high", value: (r) => r.points },
+  { key: "pct",     label: "Pct",    title: "Points percentage, finished matches", better: "high", value: (r) => (r.pctOf > 0 ? r.pctPoints / r.pctOf : null) },
+  { key: "avg",     label: "Avg",    title: "Average score",                       better: "low",  value: (r) => r.avgScore },
+  { key: "birdies", label: "Bir",    title: "Birdies or better",                   better: "high", value: (r) => r.birdies },
+  { key: "best",    label: "Best",   title: "Best round versus par",               better: "low",  value: (r) => r.bestRound },
+];
+const columnByKey = (key) => COLUMNS.find((c) => c.key === key);
+
+// The current sort: which column, and whether it's flipped from
+// "best first" to "worst first". Default is points, leader on top.
+let sortKey = "points";
+let sortReversed = false;
+
+// compareBest(column, a, b): the comparison rule a sort uses, written
+// so that "a comes first" gives a negative number. It puts the BETTER
+// value first, and "no data" (null) after every real value. Strings
+// (player names) compare alphabetically, numbers by size.
+function compareBest(column, a, b) {
+  const va = column.value(a);
+  const vb = column.value(b);
+  if (va == null && vb == null) return 0;
+  if (va == null) return 1;    // a has no data -> a goes after b
+  if (vb == null) return -1;
+  const ascending = typeof va === "string" ? va.localeCompare(vb) : va - vb;
+  return column.better === "low" ? ascending : -ascending;
+}
+
+// The standard leaderboard order: points (most first), then average
+// score (lowest first) to split ties. Used as the tie-breaker for every
+// other column too, so e.g. two players with 4 birdies appear in
+// standings order rather than at random.
+function compareStandings(a, b) {
+  return compareBest(columnByKey("points"), a, b) || compareBest(columnByKey("avg"), a, b);
+}
+
+// Two rows "tie" in a column, i.e. share a rank, when they have the same
+// value. On the Pts column the average must match too (the old rule),
+// since that's how the standings break ties.
+function tiedIn(column, a, b) {
+  if (column.key === "points") return compareStandings(a, b) === 0;
+  return compareBest(column, a, b) === 0;
+}
+
+// Rank labels for rows already sorted BEST FIRST by `column`: 1, 2,
+// "T3", "T3", 5... Rows with no data in that column get "—" rather than
+// a rank. Returns a Map from row -> label, so the labels can follow the
+// rows if the table is then shown flipped (worst first, so the bottom
+// row reads 1).
+function rankLabels(bestFirstRows, column) {
+  const numbers = [];
+  bestFirstRows.forEach((row, i) => {
+    const prev = bestFirstRows[i - 1];
+    numbers.push(prev && tiedIn(column, prev, row) ? numbers[i - 1] : i + 1);
   });
-  return out.map((r, i) => {
-    const tied = out[i - 1] === r || out[i + 1] === r;
-    return tied ? `T${r}` : String(r);
+  const labels = new Map();
+  bestFirstRows.forEach((row, i) => {
+    const tied = numbers[i - 1] === numbers[i] || numbers[i + 1] === numbers[i];
+    let label = tied ? `T${numbers[i]}` : String(numbers[i]);
+    if (column.value(row) == null) label = "—";
+    labels.set(row, label);
   });
+  return labels;
+}
+
+// sortRows(rows): returns { rows, labels }: the rows in display order
+// for the current sort, and each row's rank label.
+//   - Sorted by a stat: ranks are by that stat.
+//   - Sorted by Player (A to Z): an alphabetical "rank" means nothing,
+//     so the # column keeps showing the points standings.
+// "Worst first" reverses only the rows that have data; the "—" rows
+// stay at the bottom either way.
+function sortRows(rows) {
+  const column = columnByKey(sortKey);
+  // [...rows] copies the list first, so sort() doesn't reorder the
+  // caller's array in place (a common JavaScript gotcha).
+  const bestFirst = [...rows].sort((a, b) => compareBest(column, a, b) || compareStandings(a, b));
+
+  const rankColumn = column.key === "name" ? columnByKey("points") : column;
+  const rankSource = column.key === "name" ? [...rows].sort(compareStandings) : bestFirst;
+  const labels = rankLabels(rankSource, rankColumn);
+
+  if (!sortReversed) return { rows: bestFirst, labels };
+  const withData = bestFirst.filter((r) => column.value(r) != null);
+  const noData = bestFirst.filter((r) => column.value(r) == null);
+  return { rows: [...withData.reverse(), ...noData], labels };
+}
+
+// One column heading: a button that sorts by that column. aria-sort
+// tells screen readers which column is sorted and which way. The arrow
+// shows the direction of the numbers (▼ = biggest at top, ▲ =
+// smallest at top); its space is always reserved, so the columns don't
+// shift sideways when the arrow moves from one column to another.
+function headingHtml(column) {
+  const active = column.key === sortKey;
+  // "Best first" on a high-is-better column means biggest at the top.
+  const biggestOnTop = (column.better === "high") !== sortReversed;
+  const arrow = active ? (biggestOnTop ? "▼" : "▲") : "";
+  const ariaSort = active ? ` aria-sort="${biggestOnTop ? "descending" : "ascending"}"` : "";
+  const text = column.title ? `<abbr title="${column.title}">${column.label}</abbr>` : column.label;
+  const numeric = column.key !== "name";
+  // For right-aligned number columns the arrow sits on the left, so the
+  // heading text stays lined up with the numbers below it.
+  const arrowHtml = `<span class="lb-sort-arrow" aria-hidden="true">${arrow}</span>`;
+  return `
+    <th class="${numeric ? "lb-num " : ""}lb-sortable${active ? " is-sorted" : ""}" scope="col"${ariaSort}>
+      <button type="button" class="lb-sort" data-sort="${column.key}">
+        ${numeric ? arrowHtml + text : text + arrowHtml}
+      </button>
+    </th>`;
 }
 
 // Points percentage as a whole number, e.g. "75%"; "—" until the
@@ -104,14 +214,14 @@ function finishedMatchPoints(roundDetails) {
   };
 }
 
-function leaderboardHtml(rows) {
-  if (rows.length === 0) return `<p class="sb-empty">No players yet.</p>`;
-  const rankLabels = ranks(rows);
+function leaderboardHtml(unsortedRows) {
+  if (unsortedRows.length === 0) return `<p class="sb-empty">No players yet.</p>`;
+  const { rows, labels } = sortRows(unsortedRows);
   const body = rows
     .map(
-      (r, i) => `
+      (r) => `
         <tr>
-          <td class="lb-rank">${rankLabels[i]}</td>
+          <td class="lb-rank">${labels.get(r)}</td>
           <td class="lb-player"><span class="lb-player-inner">${avatarHtml(r.avatarName, r.team)}<span class="lb-name">${r.nameHtml}</span></span></td>
           <td class="lb-num lb-pts">${formatPoints(r.points)}</td>
           <td class="lb-num">${formatPct(r.pctPoints, r.pctOf)}</td>
@@ -130,12 +240,7 @@ function leaderboardHtml(rows) {
         <thead>
           <tr>
             <th class="lb-rank" scope="col"><abbr title="Rank">#</abbr></th>
-            <th scope="col">Player</th>
-            <th class="lb-num" scope="col"><abbr title="Points">Pts</abbr></th>
-            <th class="lb-num" scope="col"><abbr title="Points percentage, finished matches">Pct</abbr></th>
-            <th class="lb-num" scope="col"><abbr title="Average score">Avg</abbr></th>
-            <th class="lb-num" scope="col"><abbr title="Birdies or better">Bir</abbr></th>
-            <th class="lb-num" scope="col"><abbr title="Best round versus par">Best</abbr></th>
+            ${COLUMNS.map(headingHtml).join("")}
           </tr>
         </thead>
         <tbody>${body}</tbody>
@@ -188,6 +293,7 @@ function currentRows() {
       team: player.team,
       avatarName: player.name,
       nameHtml: playerLink(player.id, firstName(player.name)),
+      sortName: firstName(player.name),
       avgScore: stats.avgScore,
       points: stats.points,
       ...finishedMatchPoints(stats.roundDetails),
@@ -233,6 +339,7 @@ function careerRows() {
       team: null,
       avatarName: player.name,
       nameHtml: playerLink(player.id, firstName(player.name)),
+      sortName: firstName(player.name),
       avgScore: roundsPlayed > 0 ? totalStrokes / roundsPlayed : null,
       points,
       pctPoints,
@@ -269,6 +376,7 @@ function careerRows() {
       team: null,
       avatarName: acc.displayName,
       nameHtml: acc.displayName,
+      sortName: acc.displayName,
       avgScore: acc.roundsPlayed > 0 ? acc.totalStrokes / acc.roundsPlayed : null,
       points: acc.points,
       pctPoints: acc.points,
@@ -289,6 +397,7 @@ function lastTripRows() {
     team: p.team,
     avatarName: p.name,
     nameHtml: p.playerId ? playerLink(p.playerId, p.name) : p.name,
+    sortName: p.name,
     avgScore: p.roundsPlayed > 0 ? p.totalStrokes / p.roundsPlayed : null,
     points: p.points,
     pctPoints: p.points,
@@ -323,7 +432,12 @@ function render() {
   if (tab.id === "alltime") html = liveReady ? leaderboardHtml(careerRows()) : SKELETON_TABLE;
   else if (tab.id === String(CURRENT_YEAR)) html = liveReady ? leaderboardHtml(currentRows()) : SKELETON_TABLE;
   else html = leaderboardHtml(lastTripRows());
+  // Redrawing replaces the table, which would drop keyboard focus from
+  // a sort heading the user just pressed; note which one had focus and
+  // put it back after (same trick as the tabs above).
+  const focusedSort = document.activeElement?.closest?.(".lb-sort")?.dataset.sort;
   board.innerHTML = html;
+  if (focusedSort) board.querySelector(`[data-sort="${focusedSort}"]`)?.focus();
   if (html === SKELETON_TABLE) board.setAttribute("aria-busy", "true");
   else board.removeAttribute("aria-busy");
 }
@@ -335,6 +449,23 @@ document.getElementById("st-tabs").addEventListener("click", (event) => {
   if (!button) return;
   selectedTab = button.dataset.tab;
   history.replaceState(null, "", `#${encodeURIComponent(selectedTab)}`);
+  render();
+});
+
+// Sort-heading taps. The table is rebuilt on every render, so the
+// listener goes on the board around it (which is never replaced) and
+// checks which heading was tapped: "event delegation" again.
+// Same heading as now: flip the direction. New heading: best first.
+document.getElementById("st-board").addEventListener("click", (event) => {
+  const button = event.target.closest(".lb-sort");
+  if (!button) return;
+  const key = button.dataset.sort;
+  if (key === sortKey) {
+    sortReversed = !sortReversed;
+  } else {
+    sortKey = key;
+    sortReversed = false;
+  }
   render();
 });
 
