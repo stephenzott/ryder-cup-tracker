@@ -19,7 +19,8 @@ import { ROUNDS, pointsAvailable, TOTAL_POINTS_AVAILABLE } from "./rounds-config
 import { sumMatchPoints, scoreMatch } from "./scoring.js";
 import { flash } from "./flash.js";
 // formatPoints shows halves as "½" (e.g. 12½); shared with the scoreboard and round pages.
-import { formatPoints } from "./match-ui.js";
+import { formatPoints, CURRENT_YEAR } from "./match-ui.js";
+import { TRIP } from "./schedule-config.js";
 
 // Width of a tug-of-war fill, as a CSS percentage: this side's points
 // as a share of everything available, capped at 100% just in case.
@@ -37,6 +38,13 @@ const POINTS_TO_WIN = TOTAL_POINTS_AVAILABLE / 2 + 0.5;
 // Total matches across the trip, summed from the config rather than
 // typed in, so it stays right if a round's matchCount ever changes.
 const TOTAL_MATCHES = ROUNDS.reduce((sum, round) => sum + round.matchCount, 0);
+
+// Header year and location from config (see schedule-config.js), so
+// next year's trip only needs the config files updated.
+document.getElementById("home-eyebrow").textContent = `${CURRENT_YEAR} Ryder Cup Trip`;
+document.getElementById("home-location").innerHTML =
+  `<span class="nowrap">${TRIP.courses}</span> · <span class="nowrap">${TRIP.place}</span>`;
+document.title = `${CURRENT_YEAR} Ryder Cup Trip — Live Standings`;
 
 document.getElementById("intro-blurb").textContent =
   `16 players, 4 rounds, straight Nassau scoring (1 point front 9, 1 point back 9, ` +

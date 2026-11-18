@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Inter:wght@400;500;600&display=swap" />
   <title>2027 Ryder Cup Trip — Live Standings</title>
-  <link rel="stylesheet" href="css/style.css?v=7" />
+  <link rel="stylesheet" href="css/style.css?v=8" />
 </head>
 <body>
   <!-- Every number below starts at a sensible default (0, "30½", "0 of
@@ -18,10 +18,14 @@
 
   <!-- 1. Navy header band (edge to edge; see .home-header in style.css). -->
   <header class="home-header">
-    <h1 class="home-eyebrow">2027 Ryder Cup Trip</h1>
+    <h1 class="home-eyebrow" id="home-eyebrow">2027 Ryder Cup Trip</h1>
     <!-- Each half is kept on one line (.nowrap), so on a narrow phone
-         the line breaks at the "·" instead of stranding "WI". -->
-    <p class="home-location"><span class="nowrap">Whistling Straits &amp; Blackwolf Run</span> · <span class="nowrap">Sheboygan, WI</span></p>
+         the line breaks at the "·" instead of stranding "WI".
+         The year and location are re-written by index.js from
+         CURRENT_YEAR (match-ui.js) and TRIP (schedule-config.js), so
+         next year they update from config; the text here is only a
+         fallback for the split second before the script runs. -->
+    <p class="home-location" id="home-location"><span class="nowrap">Whistling Straits &amp; Blackwolf Run</span> · <span class="nowrap">Sheboygan, WI</span></p>
   </header>
 
   <!-- 2. Score banner: two team panels, then the tug-of-war bar. -->

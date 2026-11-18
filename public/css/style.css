@@ -2819,3 +2819,262 @@ th.lb-num {
   font-size: 1.15rem;
   font-variant-numeric: tabular-nums;
 }
+
+/* ==================================================================
+   10. SCHEDULE PAGE  (schedule.html; built by js/schedule.js)
+   ================================================================== */
+
+/* Itinerary cards: one column on phones, two side by side from 700px. */
+.sch-cards {
+  display: grid;
+  gap: var(--space-3);
+}
+
+@media (min-width: 700px) {
+  .sch-cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.sch-cards > .sb-card {
+  margin-top: 0;   /* the grid gap does the spacing */
+}
+
+/* Day + "Round 1" on the left, format pill on the right. */
+.sch-card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--space-2);
+}
+
+.sch-day {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.85rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.sch-round {
+  margin: 0;
+  font-size: 1.35rem;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+/* Format pill: navy outline (a format isn't a team, so no red/blue). */
+.sch-format {
+  display: inline-block;
+  padding: 3px 10px;
+  border: 1.5px solid var(--navy);
+  border-radius: var(--radius-pill);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.85rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--navy);
+  white-space: nowrap;
+}
+
+.sch-course {
+  margin-top: var(--space-1);
+  font-weight: 600;
+}
+
+/* Tee / Rating-Slope / Yardage: as many columns as fit (3 on most
+   phones, wrapping if the tee wording is long). */
+.sch-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
+  gap: var(--space-2) var(--space-3);
+  margin: var(--space-3) 0 0;
+}
+
+.sch-facts dt {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.sch-facts dd {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.1rem;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+}
+
+/* "Round page" / "Scorecard PDF" buttons (links styled as buttons). */
+.sch-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+.sch-btn {
+  flex: 1 1 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 var(--space-4);
+  border: 1px solid var(--navy);
+  border-radius: var(--radius-card);
+  background: var(--navy);
+  color: var(--on-navy);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.95rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  text-decoration: none;
+}
+
+.sch-btn:hover {
+  background: var(--navy-hover);
+  color: var(--on-navy);
+}
+
+.sch-btn-secondary {
+  background: var(--card);
+  border-color: var(--border);
+  color: var(--navy);
+}
+
+.sch-btn-secondary:hover {
+  background: var(--bg);
+  color: var(--navy);
+}
+
+/* "Good to know" list in a white card. */
+.sch-notes {
+  margin: 0;
+  padding: var(--space-3) var(--space-4) var(--space-3) var(--space-6);
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+}
+
+.sch-notes li {
+  margin: 6px 0;
+}
+
+/* Course-handicap formula card. */
+.sch-formula {
+  padding: var(--space-4);
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+}
+
+.sch-formula-eq {
+  margin: 0 0 var(--space-3);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.25rem;
+  line-height: 1.3;
+  color: var(--navy);
+}
+
+/* What each symbol means: label column + explanation column. */
+.sch-formula-vars {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0;
+}
+
+.sch-formula-vars div {
+  display: grid;
+  grid-template-columns: 7.5em 1fr;
+  gap: var(--space-2);
+}
+
+.sch-formula-vars dt {
+  font-family: var(--font-display);
+  font-weight: 700;
+  color: var(--navy);
+}
+
+.sch-formula-vars dd {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+.sch-par {
+  margin: var(--space-3) 0 0;
+  font-size: 0.9rem;
+}
+
+/* Tee charts: the same open/close card as "How scoring works" on
+   Home, stacked closer together, with a second line in the summary. */
+.sch-tee-details {
+  margin-top: var(--space-2);
+}
+
+.sch-tee-details summary {
+  padding-block: 6px;
+}
+
+.sch-summary {
+  display: flex;
+  flex-direction: column;
+}
+
+.sch-summary-sub {
+  font-family: var(--font-body);
+  font-weight: 400;
+  font-size: 0.8rem;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--muted);
+}
+
+.sch-tee-details .lb-wrap {
+  margin: 0 0 var(--space-2);
+  box-shadow: none;
+}
+
+.sch-tee-name {
+  white-space: normal;
+}
+
+/* The tee you play: light grey-blue row, bold, with a navy tag. */
+.sch-tee-table tr.is-ours td {
+  background: var(--empty);
+  font-weight: 600;
+}
+
+.sch-tag {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: var(--radius-pill);
+  background: var(--navy);
+  color: var(--on-navy);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  vertical-align: 1px;
+}
+
+.sch-pdf-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  margin-bottom: var(--space-2);
+  font-size: 0.9rem;
+}
