@@ -203,7 +203,9 @@ function hardestHoles(count, avoidHoles = []) {
 // which holes a given count would hit) before even entering a number
 // -- a "*" after the index flags a 2nd stroke there (only possible for
 // shot counts above 18). Laid out as a 9-column grid (front nine on
-// top, back nine below) by CSS.
+// top, back nine below) by CSS. Each box has two parts: a small
+// "Hole 7" label on top and the stroke index below it (.ht-si), so
+// "Apply" can update just the index.
 function strokesDisplayStrip(playerId, currentHoles) {
   let html = "";
   for (let h = 1; h <= 18; h++) {
@@ -211,7 +213,9 @@ function strokesDisplayStrip(playerId, currentHoles) {
     const strokeIndex = course.holes[h - 1].strokeIndex;
     const label = count > 1 ? `${strokeIndex}*` : String(strokeIndex);
     html += `<div class="hole-toggle-btn${count > 0 ? " toggled" : ""}"
-               data-player-id="${playerId}" data-hole="${h}" data-stroke-count="${count}">${label}</div>`;
+               data-player-id="${playerId}" data-hole="${h}" data-stroke-count="${count}">
+               <span class="ht-hole">Hole ${h}</span><span class="ht-si">${label}</span>
+             </div>`;
   }
   return html;
 }
@@ -341,7 +345,8 @@ function renderAdminSetup() {
           const strokeCount = holes.filter((x) => x === h).length;
           const strokeIndex = course.holes[h - 1].strokeIndex;
           holeBox.dataset.strokeCount = strokeCount;
-          holeBox.textContent = strokeCount > 1 ? `${strokeIndex}*` : String(strokeIndex);
+          // Only the stroke-index part changes; the "Hole N" label stays.
+          holeBox.querySelector(".ht-si").textContent = strokeCount > 1 ? `${strokeIndex}*` : String(strokeIndex);
           holeBox.classList.toggle("toggled", strokeCount > 0);
         });
     });

@@ -68,7 +68,7 @@ function demoBarHtml(state) {
       .join("")}</optgroup>`;
   return `
     <details class="demo-bar">
-      <summary><span class="demo-tag">DEMO</span> Made-up data · nothing is saved</summary>
+      <summary><span class="demo-tag">DEMO</span> Made-up data · not saved</summary>
       <div class="demo-controls">
         <label>Scenario
           <select id="demo-scenario">${scenarioOptions}</select>
