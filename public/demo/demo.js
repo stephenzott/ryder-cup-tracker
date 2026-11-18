@@ -2,10 +2,11 @@
 // page) inside demo.html, running that page's real script, and adds
 // the yellow demo bar.
 //
-// Which page: demo.html?page=index | scoreboard | round1 ... round4.
+// Which page: demo.html?page=index | scoreboard | admin | round1 ... round4.
 // Which scenario: demo.html?scenario=play | setup (see state.js).
-// With no ?page=, it opens the round that's "in progress", which is
-// the "standing on the tee mid-round" view.
+// With no ?page=, the play scenario opens the round that's "in
+// progress" (the "standing on the tee" view), and the setup scenario
+// opens the Admin page on Round 4.
 //
 // How it shows a real page without copying it: fetch that page's HTML
 // file, move its body content into this page, then load its script.
@@ -31,13 +32,13 @@ import { startLiveSimulation } from "./fake-firestore.js";
 // How often another group finishes a hole in the "live" demo.
 const LIVE_SECONDS = 20;
 
-const DEMO_PAGES = ["index", "scoreboard", ...ROUNDS.map((r) => r.id)];
+const DEMO_PAGES = ["index", "scoreboard", "admin", ...ROUNDS.map((r) => r.id)];
 
 // Links to these real pages are kept inside the demo (rewritten to
 // demo.html?page=...). Anything else (Roster, Stats, a player card,
 // Schedule) opens the real page, which shows real data.
 function demoLinkFor(href) {
-  const match = /^(?:\/)?(index|scoreboard|round[1-4])\.html(#.*)?$/.exec(href || "");
+  const match = /^(?:\/)?(index|scoreboard|admin|round[1-4])\.html(#.*)?$/.exec(href || "");
   return match ? `demo.html?page=${match[1]}${match[2] || ""}` : null;
 }
 
@@ -109,7 +110,12 @@ async function start() {
     restartWithScenario(wanted);
     state = getState();   // the freshly rebuilt data
   }
-  const page = DEMO_PAGES.includes(params.get("page")) ? params.get("page") : state.liveRoundId;
+  const defaultPage = currentScenario() === "setup" ? "admin" : state.liveRoundId;
+  const page = DEMO_PAGES.includes(params.get("page")) ? params.get("page") : defaultPage;
+  // The setup scenario's Admin page should open on Round 4's tab.
+  if (page === "admin" && !location.hash && currentScenario() === "setup") {
+    history.replaceState(null, "", `${location.search || "?page=admin"}#${state.liveRoundId}`);
+  }
 
   // Fetch the real page and copy its content (minus its scripts) in.
   const html = await (await fetch(`/${page}.html`)).text();

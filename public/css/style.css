@@ -3103,3 +3103,52 @@ th.lb-num {
   margin-bottom: var(--space-2);
   font-size: 0.9rem;
 }
+
+/* ==================================================================
+   11. ADMIN PAGE  (admin.html; built by js/admin.js)
+   Mostly reuses the roster rows (section 9) and the round-page setup
+   cards (section 8); these are the extras.
+   ================================================================== */
+
+/* Five tabs (Players + 4 rounds) have to fit a 360px phone. */
+.ad-tabs .sb-tab {
+  min-width: 60px;
+  padding: var(--space-1) 6px;
+}
+
+.ad-round-head .section-title {
+  margin-top: var(--space-4);
+}
+
+/* "Team saved." under a player's row, spanning the whole row. */
+.roster-row-status {
+  grid-column: 1 / -1;
+  margin: 0 0 var(--space-2);
+}
+
+.roster-row-status:empty {
+  display: none;
+}
+
+/* The admin-only shortcut on round pages: a slim navy-outlined bar. */
+.rd-admin-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  margin-top: var(--space-3);
+  padding: 0 var(--space-3);
+  border: 1.5px dashed var(--navy);
+  border-radius: var(--radius-card);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.95rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  text-decoration: none;
+  color: var(--navy);
+}
+
+.rd-admin-link[hidden] {
+  display: none;
+}

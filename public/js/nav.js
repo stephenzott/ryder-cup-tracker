@@ -63,7 +63,12 @@ const TABS = [
   {
     id: "more",
     label: "More",
-    menu: [{ label: "Schedule", href: "schedule.html" }],
+    menu: [
+      { label: "Schedule", href: "schedule.html" },
+      // Organizer tools (players, teams, pairings, strokes). Anyone can
+      // open it, but nothing shows until the admin code is entered.
+      { label: "Admin", href: "admin.html" },
+    ],
   },
 ];
 

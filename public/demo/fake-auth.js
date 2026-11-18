@@ -17,6 +17,16 @@ export function getUnlockPlayerId() {
 export function renderUnlockBar(container, requiredLevel, onUnlocked) {
   ready.then((state) => {
     const me = state.players.find((p) => p.id === state.you);
+    // A page that needs admin (the Admin page) stays locked in the
+    // "play" scenario, like it would for a regular player.
+    if (requiredLevel === "admin" && getUnlockLevel() !== "admin") {
+      container.innerHTML = `
+        <div class="unlock-bar">
+          <span class="status-msg">Demo: you're a player in this scenario, not an admin. Switch the scenario to "Singles setup" in the demo bar to try the Admin page.</span>
+        </div>
+      `;
+      return;
+    }
     container.innerHTML = `
       <div class="unlock-bar">
         <span class="status-msg ok">Demo: you're signed in as <strong>${me ? me.name : "?"}</strong>${getUnlockLevel() === "admin" ? " <strong>with admin access</strong>" : ""} (change it in the demo bar).</span>

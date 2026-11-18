@@ -4,18 +4,17 @@
 // file drives all four pages. It builds:
 //
 //   1. A navy header with the round, course and the round's score.
-//   2. An admin-only "match setup" section: pick who's playing each
-//      match (saved as sideA/sideB) and set handicap strokes given.
+//   2. For admins only, a link to this round's pairings and strokes
+//      (match setup lives on the Admin page, admin.html / admin.js).
 //   3. One card per match with live status and a hole-by-hole score
 //      entry panel: a current-hole bar, a tappable hole grid, big − / +
 //      steppers around each score box, and Save.
 //   4. If you've unlocked as a player, your own match goes first and a
 //      slim "Your match" bar stays pinned at the top.
 //
-// Firestore writes are exactly the same three as before the restyle
-// (pairings, strokes given, and one hole's scores); everything new here
-// is drawing or local UI state (which hole is open, unsaved drafts),
-// which is never written anywhere.
+// The only Firestore write here is one hole's scores (unchanged since
+// before the restyle). Everything else is drawing or local UI state
+// (which hole is open, unsaved drafts), which is never written anywhere.
 //
 // Sides are 'a' = USA and 'b' = EU, as in the Firestore data.
 
@@ -25,7 +24,6 @@ import {
   collection,
   doc,
   onSnapshot,
-  setDoc,
   updateDoc,
 } from "https://www.gstatic.com/firebasejs/11.3.1/firebase-firestore.js";
 import { ROUNDS, pointsAvailable } from "./rounds-config.js";
@@ -53,7 +51,7 @@ document.title = `${round.label} — Ryder Cup Trip`;
 
 // ------------------------------------------------------------------
 // Page skeleton. Parts that never change are written once; the live
-// parts (#round-total, #admin-setup, #rd-mybar, #matches) are redrawn
+// parts (#round-total, #rd-mybar, #matches) are redrawn
 // by the Firestore listeners further down. The match area starts with
 // grey placeholder cards until the data arrives.
 // ------------------------------------------------------------------
@@ -71,11 +69,9 @@ app.innerHTML = `
 
   <div id="unlock"></div>
 
-  <section id="admin-setup" class="rd-admin" hidden>
-    <h2>Match setup (admin)</h2>
-    <p class="rd-admin-intro">Pick who's playing each match. Saving pairings never touches scores already entered.</p>
-    <div id="setup-rows"></div>
-  </section>
+  <!-- Admins only: a shortcut to this round's pairings and strokes,
+       which live on the Admin page. Shown once unlocked as admin. -->
+  <a class="rd-admin-link" id="rd-admin-link" href="admin.html#${roundId}" hidden>Set up pairings &amp; strokes for this round →</a>
 
   <button type="button" class="rd-mybar" id="rd-mybar" hidden></button>
 
@@ -157,222 +153,6 @@ function myMatchId() {
       return (data.sideA || []).includes(currentPlayerId) || (data.sideB || []).includes(currentPlayerId);
     }) || null
   );
-}
-
-// ---------------------------------------------------------------
-// Admin: match setup (pairings and strokes given)
-// ---------------------------------------------------------------
-
-// Dropdowns are filtered to the roster's team assignment (team "A" =
-// USA, "B" = EU -- see roster.js) so admin isn't picking USA players
-// out of a list that also has all of the EU team mixed in.
-function playersOnTeam(team) {
-  return players.filter((p) => p.team === team);
-}
-
-function playerSelect(name, selectedId, team, label) {
-  const options = playersOnTeam(team)
-    .map((p) => `<option value="${p.id}" ${p.id === selectedId ? "selected" : ""}>${p.name}</option>`)
-    .join("");
-  return `<select name="${name}" aria-label="${label}"><option value="">—</option>${options}</select>`;
-}
-
-// The N holes a player gets strokes on: always the hardest-by-stroke-
-// index holes, in order -- that's how handicap allocation actually
-// works (never picked hole-by-hole), which is why there's no manual
-// per-hole override anywhere here. `avoidHoles` (closing holes 9/18,
-// typically) gets skipped over in favor of the next hardest hole --
-// some courses rate a closing hole as very low stroke index (e.g.
-// Straits' 18th is index 2), and you may not want the match decided
-// by a stroke on the last hole of a nine. Wraps past 18 candidates for
-// counts above that (2nd stroke on the hardest holes), matching full
-// handicap allocation for a high handicap. Works off course.holes'
-// par/strokeIndex data generically, so this applies the same way to
-// whatever courses get added in future years.
-function hardestHoles(count, avoidHoles = []) {
-  const sorted = [...course.holes]
-    .filter((h) => !avoidHoles.includes(h.hole))
-    .sort((a, b) => a.strokeIndex - b.strokeIndex);
-  return Array.from({ length: count }, (_, i) => sorted[i % sorted.length].hole);
-}
-
-// Read-only grid showing where a player's strokes currently land --
-// view only, not clickable, since strokes are always set via the shot
-// count + "Apply," never picked hole-by-hole. Each box always shows
-// that hole's stroke index, so you can see the difficulty ranking (and
-// which holes a given count would hit) before even entering a number
-// -- a "*" after the index flags a 2nd stroke there (only possible for
-// shot counts above 18). Laid out as a 9-column grid (front nine on
-// top, back nine below) by CSS. Each box has two parts: a small
-// "Hole 7" label on top and the stroke index below it (.ht-si), so
-// "Apply" can update just the index.
-function strokesDisplayStrip(playerId, currentHoles) {
-  let html = "";
-  for (let h = 1; h <= 18; h++) {
-    const count = currentHoles.filter((x) => x === h).length;
-    const strokeIndex = course.holes[h - 1].strokeIndex;
-    const label = count > 1 ? `${strokeIndex}*` : String(strokeIndex);
-    html += `<div class="hole-toggle-btn${count > 0 ? " toggled" : ""}"
-               data-player-id="${playerId}" data-hole="${h}" data-stroke-count="${count}">
-               <span class="ht-hole">Hole ${h}</span><span class="ht-si">${label}</span>
-             </div>`;
-  }
-  return html;
-}
-
-// Strokes-given setup for one match -- only for rounds where it's
-// eligible (3 and 4), and only once pairings are actually set (no
-// point picking strokes for players that aren't assigned yet).
-function renderStrokesGivenRow(matchId, data) {
-  if (!round.strokesGivenEligible) return "";
-  const sideA = data.sideA || [];
-  const sideB = data.sideB || [];
-  if (sideA.length === 0 || sideB.length === 0) return "";
-
-  const playerRows = [...sideA, ...sideB]
-    .map((pid) => {
-      const current = (data.strokesGiven && data.strokesGiven[pid]) || [];
-      return `
-        <div class="strokes-player">
-          <div class="strokes-player-name">${playerLink(pid, playerName(pid))}</div>
-          <div class="strokes-player-controls">
-            <label class="strokes-count-label">Shots
-              <input type="number" min="0" max="36" class="strokes-count-input" data-player-id="${pid}" value="${current.length}" />
-            </label>
-            <label class="strokes-avoid-label"><input type="checkbox" class="avoid-closing-checkbox" data-player-id="${pid}" /> Avoid 9 &amp; 18</label>
-            <button type="button" class="secondary apply-strokes" data-player-id="${pid}">Apply to hardest holes</button>
-          </div>
-          <div class="strokes-toggle-strip" data-player-id="${pid}" aria-label="Stroke index per hole; highlighted holes get a stroke">${strokesDisplayStrip(pid, current)}</div>
-        </div>
-      `;
-    })
-    .join("");
-
-  return `
-    <div class="strokes-given-row" data-strokes-match-id="${matchId}">
-      <h3 class="rd-setup-subtitle">${matchId.replace("match", "Match ")} — strokes given</h3>
-      <p class="rd-help">Enter a shot count and tap Apply. Strokes always go on the hardest holes in order, same as real handicap allocation. Numbers in the grid are each hole's stroke index.</p>
-      ${playerRows}
-      <div class="rd-actions">
-        <button type="button" class="save-strokes" data-match-id="${matchId}">Save strokes given</button>
-        <span class="status-msg" data-save-status="${matchId}-strokes"></span>
-      </div>
-    </div>
-  `;
-}
-
-function renderAdminSetup() {
-  const section = document.getElementById("admin-setup");
-  section.hidden = !isAdminUnlocked;
-  if (!isAdminUnlocked) return;
-
-  const usaCount = playersOnTeam("A").length;
-  const euCount = playersOnTeam("B").length;
-  const teamWarning =
-    usaCount === 0 || euCount === 0
-      ? `<p class="status-msg error">No players assigned to a team yet — assign teams on the <a href="roster.html">Roster</a> page first.</p>`
-      : "";
-
-  document.getElementById("setup-rows").innerHTML =
-    teamWarning +
-    matchIds()
-      .map((matchId) => {
-        const data = matchesById[matchId] || {};
-        const sideA = data.sideA || [];
-        const sideB = data.sideB || [];
-        const label = matchId.replace("match", "Match ");
-        const aSelects = Array.from({ length: round.playersPerSide }, (_, i) =>
-          playerSelect(`${matchId}-a-${i}`, sideA[i], "A", `${label}, USA player ${i + 1}`)
-        ).join("");
-        const bSelects = Array.from({ length: round.playersPerSide }, (_, i) =>
-          playerSelect(`${matchId}-b-${i}`, sideB[i], "B", `${label}, EU player ${i + 1}`)
-        ).join("");
-        return `
-        <div class="rd-setup-card">
-          <div class="rd-setup-row" data-setup-row="${matchId}">
-            <h3 class="rd-setup-subtitle">${label}</h3>
-            <div class="rd-setup-sides">
-              <div class="rd-setup-side rd-setup-usa"><span class="rd-setup-team">USA</span>${aSelects}</div>
-              <div class="rd-setup-side rd-setup-eu"><span class="rd-setup-team">EU</span>${bSelects}</div>
-            </div>
-            <div class="rd-actions">
-              <button type="button" class="save-pairing" data-match-id="${matchId}">Save pairing</button>
-              <span class="status-msg" data-save-status="${matchId}"></span>
-            </div>
-          </div>
-          ${renderStrokesGivenRow(matchId, data)}
-        </div>
-      `;
-      })
-      .join("");
-
-  document.querySelectorAll(".save-pairing").forEach((btn) => {
-    btn.addEventListener("click", async () => {
-      const matchId = btn.dataset.matchId;
-      const row = document.querySelector(`[data-setup-row="${matchId}"]`);
-      const sideA = Array.from({ length: round.playersPerSide }, (_, i) =>
-        row.querySelector(`[name="${matchId}-a-${i}"]`).value
-      ).filter(Boolean);
-      const sideB = Array.from({ length: round.playersPerSide }, (_, i) =>
-        row.querySelector(`[name="${matchId}-b-${i}"]`).value
-      ).filter(Boolean);
-      // merge: true means this only ever touches sideA/sideB -- any
-      // `holes` data already saved for this match is left alone.
-      await setDoc(matchRef(matchId), { sideA, sideB }, { merge: true });
-      const status = row.querySelector(`[data-save-status="${matchId}"]`);
-      status.textContent = "Saved.";
-      status.className = "status-msg ok";
-    });
-  });
-
-  // "Apply to hardest holes": fills the (read-only) grid from the
-  // number input and the "avoid 9 & 18" checkbox. The only way
-  // strokes ever get set -- nothing here is directly clickable.
-  // Doesn't touch other players or save anything by itself.
-  document.querySelectorAll(".apply-strokes").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      const playerId = btn.dataset.playerId;
-      const count = parseInt(
-        document.querySelector(`.strokes-count-input[data-player-id="${playerId}"]`).value || "0",
-        10
-      );
-      const avoidClosing = document.querySelector(`.avoid-closing-checkbox[data-player-id="${playerId}"]`).checked;
-      const holes = hardestHoles(count, avoidClosing ? [9, 18] : []);
-      document
-        .querySelectorAll(`.strokes-toggle-strip[data-player-id="${playerId}"] .hole-toggle-btn`)
-        .forEach((holeBox) => {
-          const h = parseInt(holeBox.dataset.hole, 10);
-          const strokeCount = holes.filter((x) => x === h).length;
-          const strokeIndex = course.holes[h - 1].strokeIndex;
-          holeBox.dataset.strokeCount = strokeCount;
-          // Only the stroke-index part changes; the "Hole N" label stays.
-          holeBox.querySelector(".ht-si").textContent = strokeCount > 1 ? `${strokeIndex}*` : String(strokeIndex);
-          holeBox.classList.toggle("toggled", strokeCount > 0);
-        });
-    });
-  });
-
-  document.querySelectorAll(".save-strokes").forEach((btn) => {
-    btn.addEventListener("click", async () => {
-      const matchId = btn.dataset.matchId;
-      const row = document.querySelector(`[data-strokes-match-id="${matchId}"]`);
-      const strokesGiven = {};
-      row.querySelectorAll(".strokes-player").forEach((playerBlock) => {
-        const strip = playerBlock.querySelector(".strokes-toggle-strip");
-        const playerId = strip.dataset.playerId;
-        const holes = [];
-        strip.querySelectorAll(".hole-toggle-btn").forEach((holeBtn) => {
-          const count = parseInt(holeBtn.dataset.strokeCount, 10);
-          for (let i = 0; i < count; i++) holes.push(parseInt(holeBtn.dataset.hole, 10));
-        });
-        strokesGiven[playerId] = holes;
-      });
-      await setDoc(matchRef(matchId), { strokesGiven }, { merge: true });
-      const status = row.querySelector(`[data-save-status="${matchId}-strokes"]`);
-      status.textContent = "Saved.";
-      status.className = "status-msg ok";
-    });
-  });
 }
 
 // ---------------------------------------------------------------
@@ -753,7 +533,7 @@ document.getElementById("rd-mybar").addEventListener("click", (event) => {
 });
 
 function render() {
-  renderAdminSetup();
+  document.getElementById("rd-admin-link").hidden = !isAdminUnlocked;
   renderMatches();
 }
 

@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Inter:wght@400;500;600&display=swap" />
   <title>Roster — Ryder Cup Trip</title>
-  <link rel="stylesheet" href="css/style.css?v=9" />
+  <link rel="stylesheet" href="css/style.css?v=10" />
 </head>
 <body>
 
@@ -32,37 +32,9 @@
     </section>
   </div>
 
-  <section class="roster-admin">
-    <h2 class="section-title">Admin</h2>
-    <p class="rd-help">Add, remove, or reassign players. Requires the admin code.</p>
-    <div id="unlock"></div>
+  <p class="st-note">Organizers add players and set teams on the <a href="admin.html">Admin</a> page.</p>
 
-    <!-- "locked" fades this card and blocks taps until unlocked. -->
-    <div id="admin-controls" class="locked roster-add-card">
-      <h3 class="rd-setup-subtitle">Add player</h3>
-      <form id="add-player-form" class="roster-form">
-        <label class="roster-field">Name
-          <input type="text" id="new-player-name" placeholder="Player name" required />
-        </label>
-        <label class="roster-field">Handicap index
-          <input type="number" id="new-player-handicap" placeholder="e.g. 12.4" step="0.1" />
-        </label>
-        <label class="roster-field">Team (this year)
-          <select id="new-player-team">
-            <option value="">Unassigned</option>
-            <option value="A">Team USA</option>
-            <option value="B">Team EU</option>
-          </select>
-        </label>
-        <div class="rd-actions">
-          <button type="submit">Add player</button>
-          <span class="status-msg" id="add-player-status"></span>
-        </div>
-      </form>
-    </div>
-  </section>
-
-  <script type="module" src="js/nav.js?v=2"></script>
+  <script type="module" src="js/nav.js?v=3"></script>
   <script type="module" src="js/roster.js"></script>
 </body>
 </html>
