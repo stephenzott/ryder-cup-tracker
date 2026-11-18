@@ -196,6 +196,13 @@ export const CURRENT_YEAR = 2027;
 // Team codes come in two spellings: "A"/"B" in Firestore's players
 // collection (this year), "usa"/"europe" in history-data.js (past
 // trips). Both map to a CSS suffix: "usa", "eu", or "none".
+//
+// Besides the two teams, a player's `team` in Firestore can be:
+//   empty (null or "")  "Confirmed": coming this year, no team yet
+//   "unconfirmed"       not yet confirmed they're coming
+// Both are shown in the neutral navy color, since neither is a team.
+export const UNCONFIRMED = "unconfirmed";
+
 export function teamKey(team) {
   if (team === "A" || team === "usa") return "usa";
   if (team === "B" || team === "europe") return "eu";
@@ -206,7 +213,39 @@ export function teamName(team) {
   const key = teamKey(team);
   if (key === "usa") return "Team USA";
   if (key === "eu") return "Team EU";
-  return "Unassigned";
+  if (team === UNCONFIRMED) return "Unconfirmed";
+  return "Confirmed";
+}
+
+// The roster's groups, in display order, shared by the Roster page and
+// the Admin page's Players tab so the two always group players the same
+// way. `team` is the value passed to teamPillHtml for the group heading;
+// `match` decides who belongs in it. `alwaysShow` = show the group even
+// when empty (only the two teams; the others appear only if anyone is
+// in them).
+export const ROSTER_GROUPS = [
+  { team: "A", alwaysShow: true, match: (p) => p.team === "A" },
+  { team: "B", alwaysShow: true, match: (p) => p.team === "B" },
+  // Confirmed = anything that isn't a team or "unconfirmed". Written
+  // this way (rather than "team is empty") so a player with some
+  // unexpected team value still shows up somewhere instead of vanishing.
+  { team: null, alwaysShow: false, match: (p) => !["A", "B", UNCONFIRMED].includes(p.team) },
+  { team: UNCONFIRMED, alwaysShow: false, match: (p) => p.team === UNCONFIRMED },
+];
+
+// The <option>s for a team dropdown on the Admin page, with `selected`
+// pre-chosen. The value is what gets saved to Firestore ("" saves as
+// null, i.e. Confirmed).
+export function teamOptionsHtml(selected) {
+  const options = [
+    ["A", "Team USA"],
+    ["B", "Team EU"],
+    ["", "Confirmed"],
+    [UNCONFIRMED, "Unconfirmed"],
+  ];
+  return options
+    .map(([value, label]) => `<option value="${value}" ${(selected || "") === value ? "selected" : ""}>${label}</option>`)
+    .join("");
 }
 
 // An initials circle. `team` colors it (red / blue); pass null for the

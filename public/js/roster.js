@@ -15,7 +15,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/11.3.1/firebase-firestore.js";
 import { playerLink } from "./player-stats.js";
 // Shared look: initials circles, team pills, the year constant.
-import { avatarHtml, teamPillHtml, CURRENT_YEAR } from "./match-ui.js";
+import { avatarHtml, teamPillHtml, ROSTER_GROUPS, CURRENT_YEAR } from "./match-ui.js";
 
 const groupsEl = document.getElementById("roster-groups");
 
@@ -47,12 +47,9 @@ function playerRowHtml(p) {
   `;
 }
 
-// Groups in display order. Unassigned only appears if anyone is.
-const GROUPS = [
-  { team: "A", match: (p) => p.team === "A" },
-  { team: "B", match: (p) => p.team === "B" },
-  { team: null, match: (p) => p.team !== "A" && p.team !== "B" },
-];
+// Groups in display order come from ROSTER_GROUPS (match-ui.js), shared
+// with the Admin page: Team USA, Team EU, Confirmed (coming, no team
+// yet), Unconfirmed. The last two only appear if anyone is in them.
 
 function renderTable() {
   groupsEl.removeAttribute("aria-busy");
@@ -62,10 +59,10 @@ function renderTable() {
     return;
   }
 
-  groupsEl.innerHTML = GROUPS.map(({ team, match }) => {
+  groupsEl.innerHTML = ROSTER_GROUPS.map(({ team, match, alwaysShow }) => {
     // latestPlayers is already sorted by name (see the query below).
     const members = latestPlayers.filter(match);
-    if (members.length === 0 && team === null) return "";
+    if (members.length === 0 && !alwaysShow) return "";
     return `
       <section class="roster-group">
         <h2 class="roster-group-title">

@@ -36,7 +36,7 @@ import {
 import { ROUNDS } from "./rounds-config.js";
 import { COURSES } from "./courses-config.js";
 import { playerLink } from "./player-stats.js";
-import { avatarHtml, teamPillHtml, CURRENT_YEAR } from "./match-ui.js";
+import { avatarHtml, teamPillHtml, teamOptionsHtml, ROSTER_GROUPS, CURRENT_YEAR } from "./match-ui.js";
 
 // ------------------------------------------------------------------
 // State
@@ -134,9 +134,7 @@ function playerRowHtml(p) {
       <span class="roster-hcp"><span class="roster-hcp-label">HCP</span> ${p.handicapIndex ?? "—"}</span>
       <div class="roster-row-admin">
         <select data-id="${p.id}" class="team-select" aria-label="${CURRENT_YEAR} team for ${name}">
-          <option value="" ${!p.team ? "selected" : ""}>Unassigned</option>
-          <option value="A" ${p.team === "A" ? "selected" : ""}>Team USA</option>
-          <option value="B" ${p.team === "B" ? "selected" : ""}>Team EU</option>
+          ${teamOptionsHtml(p.team)}
         </select>
         <button type="button" class="secondary remove-player" data-id="${p.id}">Remove</button>
       </div>
@@ -146,13 +144,11 @@ function playerRowHtml(p) {
 }
 
 function playersTabHtml() {
-  const groups = [
-    { team: "A", members: players.filter((p) => p.team === "A") },
-    { team: "B", members: players.filter((p) => p.team === "B") },
-    { team: null, members: players.filter((p) => p.team !== "A" && p.team !== "B") },
-  ];
+  // Same groups as the Roster page (ROSTER_GROUPS in match-ui.js):
+  // USA, EU, Confirmed (no team yet), Unconfirmed.
+  const groups = ROSTER_GROUPS.map((g) => ({ ...g, members: players.filter(g.match) }));
   const groupsHtml = groups
-    .filter((g) => g.members.length || g.team !== null)
+    .filter((g) => g.members.length || g.alwaysShow)
     .map(
       (g) => `
         <section class="roster-group">
@@ -180,9 +176,7 @@ function playersTabHtml() {
         </label>
         <label class="roster-field">Team (${CURRENT_YEAR})
           <select id="new-player-team">
-            <option value="">Unassigned</option>
-            <option value="A">Team USA</option>
-            <option value="B">Team EU</option>
+            ${teamOptionsHtml(null)}
           </select>
         </label>
         <div class="rd-actions">
