@@ -1,0 +1,113 @@
+<!doctype html>
+<!-- DEMO ONLY: never deployed (listed under "ignore" in firebase.json).
+     Run the hosting emulator and open http://127.0.0.1:5002/demo.html
+
+     Shows the real Home / Scoreboard / Round pages, running their real
+     code, but fed made-up mid-round data instead of Firestore. Nothing
+     is read from or written to the live database (apart from one
+     read-only fetch of the public player names). -->
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0B1F3A" />
+  <title>DEMO — Ryder Cup Trip</title>
+
+  <!-- The import map is what makes the demo work. When the app's code
+       asks for firebase-init.js, auth.js or Firebase's Firestore
+       library, the browser loads these stand-ins from /demo/ instead.
+       The app's own files are not changed at all. An import map must
+       come before any module script on the page. -->
+  <script type="importmap">
+    {
+      "imports": {
+        "/js/firebase-init.js": "/demo/fake-init.js",
+        "/js/auth.js": "/demo/fake-auth.js",
+        "https://www.gstatic.com/firebasejs/11.3.1/firebase-firestore.js": "/demo/fake-firestore.js"
+      }
+    }
+  </script>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Inter:wght@400;500;600&display=swap" />
+  <link rel="stylesheet" href="css/style.css?v=8" />
+
+  <!-- Demo bar styles (demo only, so they live here rather than in
+       style.css). The bar is a collapsible strip just above the tab
+       bar; the extra body padding keeps page content clear of it. -->
+  <style>
+    body {
+      padding-bottom: calc(var(--tabbar-height) + env(safe-area-inset-bottom) + 96px);
+    }
+
+    .demo-bar {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: calc(var(--tabbar-height) + env(safe-area-inset-bottom));
+      z-index: 99;
+      padding: 0 max(var(--space-4), env(safe-area-inset-left));
+      background: #FFF6CC;              /* pale yellow: clearly "not the real site" */
+      border-top: 2px solid #C9A400;
+      box-shadow: 0 -2px 8px rgba(11, 31, 58, 0.15);
+      font-size: 0.85rem;
+    }
+
+    .demo-bar summary {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      min-height: 44px;
+      cursor: pointer;
+      list-style: none;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .demo-bar summary::-webkit-details-marker {
+      display: none;
+    }
+
+    .demo-bar summary::after {
+      content: "Options ▴";
+      margin-left: auto;
+      font-weight: 500;
+      color: var(--muted);
+    }
+
+    .demo-bar[open] summary::after {
+      content: "Close ▾";
+    }
+
+    .demo-tag {
+      padding: 2px 8px;
+      border-radius: var(--radius-pill);
+      background: var(--text);
+      color: #FFF6CC;
+      font-family: var(--font-display);
+      font-weight: 700;
+      letter-spacing: 0.08em;
+    }
+
+    .demo-controls {
+      display: grid;
+      gap: var(--space-2);
+      padding-bottom: var(--space-3);
+    }
+
+    .demo-controls label {
+      display: grid;
+      gap: var(--space-1);
+      font-weight: 600;
+    }
+
+    .demo-controls select {
+      width: 100%;
+    }
+  </style>
+</head>
+<body>
+  <script type="module" src="demo/demo.js"></script>
+</body>
+</html>
