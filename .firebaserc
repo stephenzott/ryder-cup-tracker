@@ -1,5 +1,15 @@
 {
   "projects": {
     "default": "golf-tracker-data"
-  }
+  },
+  "targets": {
+    "golf-tracker-data": {
+      "hosting": {
+        "ryder": [
+          "the-cup-tracker"
+        ]
+      }
+    }
+  },
+  "etags": {}
 }
