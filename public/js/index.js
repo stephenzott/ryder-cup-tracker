@@ -48,7 +48,7 @@ document.title = `${CURRENT_YEAR} Ryder Cup Trip — Live Standings`;
 
 document.getElementById("intro-blurb").textContent =
   `16 players, 4 rounds, straight Nassau scoring (1 point front 9, 1 point back 9, ` +
-  `1 point overall — no auto presses). ${TOTAL_POINTS_AVAILABLE} points total are up for ` +
+  `1 point overall). ${TOTAL_POINTS_AVAILABLE} points total are up for ` +
   `grabs; ${formatPoints(POINTS_TO_WIN)} wins it outright, ${formatPoints(TOTAL_POINTS_AVAILABLE / 2)} is a tie.`;
 
 document.querySelectorAll(".to-win").forEach((el) => {
