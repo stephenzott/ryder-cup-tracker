@@ -1,10 +1,11 @@
 // DEMO ONLY. Stands in for /js/auth.js on the demo page. Instead of
 // the "Who are you?" picker, the demo is always "unlocked" as the
-// player chosen in the demo bar (score level, not admin).
-import { ready, getState } from "./state.js";
+// player chosen in the demo bar: score level in the "play" scenario,
+// admin (and still that player) in the "setup" scenario.
+import { ready, getState, currentScenario } from "./state.js";
 
 export function getUnlockLevel() {
-  return "score";
+  return currentScenario() === "setup" ? "admin" : "score";
 }
 
 export function getUnlockPlayerId() {
@@ -18,7 +19,7 @@ export function renderUnlockBar(container, requiredLevel, onUnlocked) {
     const me = state.players.find((p) => p.id === state.you);
     container.innerHTML = `
       <div class="unlock-bar">
-        <span class="status-msg ok">Demo: you're signed in as <strong>${me ? me.name : "?"}</strong> (change it in the demo bar).</span>
+        <span class="status-msg ok">Demo: you're signed in as <strong>${me ? me.name : "?"}</strong>${getUnlockLevel() === "admin" ? " <strong>with admin access</strong>" : ""} (change it in the demo bar).</span>
       </div>
     `;
     onUnlocked();

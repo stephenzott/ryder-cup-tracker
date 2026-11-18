@@ -23,6 +23,17 @@ const PLAYERS_URL =
 const YOUR_HOLES_PLAYED = 9;
 
 // ------------------------------------------------------------------
+// The demo "scenarios" (picked in the demo bar, or via the address,
+// e.g. demo.html?scenario=setup):
+//   play   the chosen round mid-play, your group on the 10th tee
+//   setup  Saturday morning before singles: Round 4 paired, no scores
+//          and NO handicap strokes yet; you're unlocked as admin (and
+//          still a player) so you can enter strokes in Match setup.
+export const SCENARIOS = {
+  play: { label: "Mid-round play", liveRoundId: null },   // null = keep the chosen round
+  setup: { label: "Singles setup (admin): set strokes", liveRoundId: "round4" },
+};
+
 // A small seeded random-number generator ("mulberry32"). Seeded means
 // the same seed always gives the same sequence, so a given demo setup
 // is reproducible. Returns numbers in [0, 1), like Math.random().
@@ -106,7 +117,7 @@ async function fetchPlayers() {
 // Earlier rounds come out finished, the live round mid-way, later
 // rounds without pairings yet.
 // ------------------------------------------------------------------
-function buildState(liveRoundId, basePlayers, seed, youId = null) {
+function buildState(liveRoundId, basePlayers, seed, youId = null, scenario = "play") {
   const random = makeRandom(seed);
 
   // Made-up teams: shuffle, first half USA ("A"), second half EU ("B").
@@ -144,9 +155,13 @@ function buildState(liveRoundId, basePlayers, seed, youId = null) {
       if (sideA.length < per || sideB.length < per) break;   // not enough players for this match
 
       // Holes played: all 18 in finished rounds; in the live round,
-      // your group (match 1) has played 9 and the others 5-12.
+      // your group (match 1) has played 9 and the others 5-12 -- or, in
+      // the "setup" scenario, nobody has teed off yet.
       let played = 18;
-      if (ri === liveIndex) played = m === 0 ? YOUR_HOLES_PLAYED : 5 + Math.floor(random() * 8);
+      if (ri === liveIndex) {
+        if (scenario === "setup") played = 0;
+        else played = m === 0 ? YOUR_HOLES_PLAYED : 5 + Math.floor(random() * 8);
+      }
 
       const holes = {};
       for (let h = 1; h <= played; h++) {
@@ -164,7 +179,10 @@ function buildState(liveRoundId, basePlayers, seed, youId = null) {
       const match = { sideA, sideB, holes };
 
       // Rounds with handicap strokes: one player per match gets 1-4.
-      if (round.strokesGivenEligible) {
+      // (Not in the setup scenario's live round: entering them is the
+      // point of that scenario.)
+      const strokesStillToSet = scenario === "setup" && ri === liveIndex;
+      if (round.strokesGivenEligible && !strokesStillToSet) {
         const everyone = [...sideA, ...sideB];
         const receiver = everyone[Math.floor(random() * everyone.length)];
         match.strokesGiven = { [receiver]: hardestHoles(course, 1 + Math.floor(random() * 4)) };
@@ -178,7 +196,7 @@ function buildState(liveRoundId, basePlayers, seed, youId = null) {
   // live round's match 1 (the group on the 10th tee).
   const you = youId && players.some((p) => p.id === youId) ? youId : rounds[liveRoundId]?.match1?.sideA?.[0] || players[0].id;
 
-  return { seed, liveRoundId, you, players, rounds };
+  return { seed, scenario, liveRoundId, you, players, rounds };
 }
 
 // ------------------------------------------------------------------
@@ -226,7 +244,25 @@ export function persist() {
 // made-up pairings and scores, same "you" if possible).
 export function restartWithLiveRound(liveRoundId) {
   const basePlayers = state.players.map(({ team, ...rest }) => rest);
-  state = buildState(liveRoundId, basePlayers, state.seed + 1, state.you);
+  state = buildState(liveRoundId, basePlayers, state.seed + 1, state.you, scenarioOf(state));
+  save();
+}
+
+// Older saved demo data (from before scenarios existed) counts as "play".
+function scenarioOf(s) {
+  return SCENARIOS[s.scenario] ? s.scenario : "play";
+}
+
+export function currentScenario() {
+  return scenarioOf(state);
+}
+
+// Switch scenario (rebuilds the made-up data). "setup" always uses
+// Round 4; "play" keeps the round currently chosen.
+export function restartWithScenario(scenario) {
+  const basePlayers = state.players.map(({ team, ...rest }) => rest);
+  const live = SCENARIOS[scenario].liveRoundId || (scenarioOf(state) === "setup" ? "round3" : state.liveRoundId);
+  state = buildState(live, basePlayers, state.seed + 1, state.you, scenario);
   save();
 }
 

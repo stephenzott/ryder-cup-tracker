@@ -3,6 +3,7 @@
 // the yellow demo bar.
 //
 // Which page: demo.html?page=index | scoreboard | round1 ... round4.
+// Which scenario: demo.html?scenario=play | setup (see state.js).
 // With no ?page=, it opens the round that's "in progress", which is
 // the "standing on the tee mid-round" view.
 //
@@ -13,7 +14,16 @@
 // data instead of the live database.
 
 import { ROUNDS } from "/js/rounds-config.js";
-import { ready, getState, restartWithLiveRound, setYou, resetAll } from "./state.js";
+import {
+  ready,
+  getState,
+  restartWithLiveRound,
+  restartWithScenario,
+  currentScenario,
+  SCENARIOS,
+  setYou,
+  resetAll,
+} from "./state.js";
 
 const DEMO_PAGES = ["index", "scoreboard", ...ROUNDS.map((r) => r.id)];
 
@@ -44,6 +54,10 @@ document.addEventListener(
 // The yellow bar: what's going on, plus pickers for which round is in
 // progress and which player "you" are.
 function demoBarHtml(state) {
+  const scenario = currentScenario();
+  const scenarioOptions = Object.entries(SCENARIOS)
+    .map(([id, s]) => `<option value="${id}" ${id === scenario ? "selected" : ""}>${s.label}</option>`)
+    .join("");
   const roundOptions = ROUNDS.map(
     (r) => `<option value="${r.id}" ${r.id === state.liveRoundId ? "selected" : ""}>${r.label} (${r.day})</option>`
   ).join("");
@@ -56,7 +70,12 @@ function demoBarHtml(state) {
     <details class="demo-bar">
       <summary><span class="demo-tag">DEMO</span> Made-up data · nothing is saved</summary>
       <div class="demo-controls">
-        <label>Round in progress
+        <label>Scenario
+          <select id="demo-scenario">${scenarioOptions}</select>
+        </label>
+        <!-- The setup scenario is always Round 4 (singles), so the round
+             picker only shows in the "play" scenario. -->
+        <label${scenario === "setup" ? " hidden" : ""}>Round in progress
           <select id="demo-live">${roundOptions}</select>
         </label>
         <label>You are (demo teams)
@@ -69,8 +88,16 @@ function demoBarHtml(state) {
 }
 
 async function start() {
-  const state = await ready;
+  let state = await ready;
   const params = new URLSearchParams(location.search);
+
+  // A scenario named in the address (e.g. ?scenario=setup) that isn't
+  // the current one: rebuild the made-up data for it first.
+  const wanted = params.get("scenario");
+  if (SCENARIOS[wanted] && wanted !== currentScenario()) {
+    restartWithScenario(wanted);
+    state = getState();   // the freshly rebuilt data
+  }
   const page = DEMO_PAGES.includes(params.get("page")) ? params.get("page") : state.liveRoundId;
 
   // Fetch the real page and copy its content (minus its scripts) in.
@@ -84,6 +111,10 @@ async function start() {
   document.body.prepend(...[...real.body.childNodes]);
 
   document.body.insertAdjacentHTML("beforeend", demoBarHtml(state));
+  document.getElementById("demo-scenario").addEventListener("change", (e) => {
+    restartWithScenario(e.target.value);
+    location.href = "demo.html";   // opens the scenario's round
+  });
   document.getElementById("demo-live").addEventListener("change", (e) => {
     restartWithLiveRound(e.target.value);
     location.href = `demo.html?page=${e.target.value}`;
