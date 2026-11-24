@@ -9,10 +9,12 @@
 //      the service worker (firebase-messaging-sw.js), gets this phone's
 //      push "token" from Firebase Cloud Messaging (FCM), and saves it.
 //   4/5. Level and Scope radios, saved as soon as they change.
+//   Plus: Android install/tips cards, and a "Check my setup" card shown
+//   only at alerts.html?debug.
 //
 // Where it's saved: ONE Firestore document per browser,
 //   pushSubscriptions/{uid}  (uid = this browser's anonymous sign-in)
-//   { enabled, token, playerId, level, scope, updatedAt }
+//   { enabled, token, playerId, level, scope, platform, installed, updatedAt }
 // The team is deliberately NOT stored: the server looks up the
 // player's current team each time it sends, so when the admin changes
 // teams, alerts follow automatically.
@@ -43,6 +45,17 @@ import {
   isSupported as messagingIsSupported,
 } from "https://www.gstatic.com/firebasejs/11.3.1/firebase-messaging.js";
 import { teamKey, teamName, teamPillHtml } from "./match-ui.js";
+// Device/browser questions (iPhone? installed? which browser? inside
+// Instagram's built-in browser?), kept in their own file.
+import {
+  browserFamily,
+  isAndroid,
+  isBrave,
+  isInAppBrowser,
+  isIOS,
+  isStandalone,
+  platformKey,
+} from "./platform.js";
 
 // ==================================================================
 // TODO (you, once): paste the Web Push certificate PUBLIC key here.
@@ -97,6 +110,19 @@ const statusEl = document.getElementById("al-status");
 const myTeamNameEl = document.getElementById("al-my-team-name");
 const levelInputs = [...document.querySelectorAll('input[name="level"]')];
 const scopeInputs = [...document.querySelectorAll('input[name="scope"]')];
+const installCard = document.getElementById("al-install-card");
+const installBtn = document.getElementById("al-install-btn");
+const installSteps = document.getElementById("al-install-steps");
+const androidTips = document.getElementById("al-android-tips");
+const braveHint = document.getElementById("al-brave-hint");
+const debugCard = document.getElementById("al-debug");
+const debugText = document.getElementById("al-debug-text");
+const debugCopy = document.getElementById("al-debug-copy");
+const debugStatus = document.getElementById("al-debug-status");
+
+// The "Check my setup" card appears only at alerts.html?debug.
+// URLSearchParams reads the part of the address after "?".
+const DEBUG = new URLSearchParams(location.search).has("debug");
 
 // ------------------------------------------------------------------
 // Page state.
@@ -123,21 +149,7 @@ function escapeHtml(str) {
 // 1. CAN THIS DEVICE GET ALERTS?
 // ==================================================================
 
-// iPhone or iPad? iPads running iPadOS 13+ pretend to be a Mac in their
-// user-agent text, so "Mac + touchscreen" also counts as an iPad.
-// (Sniffing the user-agent like this is a common, imperfect workaround;
-// browsers offer no clean "is this iOS?" check.)
-function isIOS() {
-  const ua = navigator.userAgent;
-  return /iPad|iPhone|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
-}
-
-// Opened from the Home Screen icon (as an installed app) rather than in
-// a Safari tab? The manifest asks for "standalone" display; iOS also
-// has an older navigator.standalone flag, checked as a backup.
-function isStandalone() {
-  return window.matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
-}
+// (isIOS, isAndroid, isStandalone etc. live in platform.js.)
 
 // The three browser features push needs.
 function browserHasPush() {
@@ -155,26 +167,53 @@ function hideNotice() {
   noticeEl.innerHTML = "";
 }
 
-const IOS_INSTALL_HTML = `
-  <h2 class="al-notice-title">Add this site to your Home Screen first</h2>
-  <p>iPhones only allow alerts for websites opened from the Home Screen.</p>
-  <ol class="al-steps">
-    <li>Tap the <strong>Share</strong> button <svg class="al-share-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12"/><path d="M8 7l4-4 4 4"/><path d="M6 11H5v10h14V11h-1"/></svg> in Safari's toolbar.</li>
-    <li>Scroll down and tap <strong>Add to Home Screen</strong>, then <strong>Add</strong>.</li>
-    <li>Close Safari and open <strong>Cup Tracker</strong> from its new icon, then come back to this page (More → Alerts).</li>
-  </ol>
-  <p class="al-notice-small">Needs iOS 16.4 or newer.</p>
+// The page's own address without any "?debug", for the Copy link button.
+const PAGE_LINK = location.origin + location.pathname;
+
+// Inside an app's built-in browser (Instagram, Facebook, Google app...):
+// those can't install or receive push, so ask for the real browser by
+// name. The address is also shown as text, so it can be long-pressed
+// and copied by hand if the Copy button isn't allowed in that app.
+function inAppHtml() {
+  const browser = isIOS() ? "Safari" : isAndroid() ? "Chrome" : "your browser";
+  return `
+    <h2 class="al-notice-title">Open this page in ${browser} first</h2>
+    <p>This app's built-in browser can't receive alerts. Tap the app's <strong>•••</strong> or <strong>⋮</strong> menu and choose <strong>Open in ${browser === "your browser" ? "browser" : browser}</strong>, or copy the link and paste it into ${browser}.</p>
+    <p class="al-link" id="al-link-text">${escapeHtml(PAGE_LINK)}</p>
+    <button type="button" id="al-copy-link">Copy link</button>
+    <span class="status-msg" id="al-copy-status" aria-live="polite"></span>
+  `;
+}
+
+// iPhone, not opened from the Home Screen. If it's not Safari (Chrome,
+// Firefox, Edge on iPhone), add a line suggesting Safari, because the
+// Share button is in a different place in each of those.
+function iosInstallHtml() {
+  const notSafari = browserFamily() !== "Safari";
+  return `
+    <h2 class="al-notice-title">Add this site to your Home Screen first</h2>
+    <p>iPhones only allow alerts for websites opened from the Home Screen.</p>
+    <ol class="al-steps">
+      <li>Tap the <strong>Share</strong> button <svg class="al-share-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12"/><path d="M8 7l4-4 4 4"/><path d="M6 11H5v10h14V11h-1"/></svg> in Safari's toolbar.</li>
+      <li>Scroll down and tap <strong>Add to Home Screen</strong>, then <strong>Add</strong>.</li>
+      <li>Close Safari and open <strong>Cup Tracker</strong> from its new icon, then come back to this page (More → Alerts).</li>
+    </ol>
+    ${notSafari ? `<p>You're using ${browserFamily()}. These steps are easiest in <strong>Safari</strong>; elsewhere the Share button is in a slightly different place.</p>` : ""}
+    <p class="al-notice-small">Needs iOS 16.4 or newer.</p>
+  `;
+}
+
+// iPhone, opened from the Home Screen, but no push support at all: that
+// only happens on iOS older than 16.4.
+const IOS_TOO_OLD_HTML = `
+  <h2 class="al-notice-title">This iPhone's software is too old for alerts</h2>
+  <p>Score alerts need iOS 16.4 or newer. You can update in <strong>Settings → General → Software Update</strong>. Until then, the <a href="scoreboard.html">Scoreboard</a> always has the live scores.</p>
 `;
 
 const UNSUPPORTED_HTML = `
   <h2 class="al-notice-title">This browser can't get alerts</h2>
   <p>It doesn't support web push notifications. Try Chrome, Edge or Firefox on a computer or Android phone, or Safari on an iPhone (iOS 16.4 or newer, from the Home Screen).</p>
 `;
-
-// Android phones/tablets say "Android" in their user-agent text.
-function isAndroid() {
-  return /Android/.test(navigator.userAgent);
-}
 
 // "How to turn notifications back on" differs per platform, so there
 // are three versions: iPhone/iPad, Android, and everything else.
@@ -205,9 +244,23 @@ const DENIED_HTML = isIOS()
 
 // Decide whether alerts are possible here, and say why not if they
 // aren't. Returns true if the settings below should work.
+// The checks run from most specific to least specific.
 async function checkDevice() {
+  // 1. Inside an app's built-in browser: hide the settings entirely.
+  if (isInAppBrowser()) {
+    showNotice(inAppHtml());
+    settingsEl.hidden = true;
+    wireCopyLink();
+    return false;
+  }
+  // 2. iPhone in a browser tab: must add to Home Screen first.
   if (isIOS() && !isStandalone()) {
-    showNotice(IOS_INSTALL_HTML);
+    showNotice(iosInstallHtml());
+    return false;
+  }
+  // 3. iPhone Home Screen app without push: iOS older than 16.4.
+  if (isIOS() && !("PushManager" in window)) {
+    showNotice(IOS_TOO_OLD_HTML);
     return false;
   }
   // messagingIsSupported() is Firebase's own fuller check (it also
@@ -240,9 +293,13 @@ async function loadSettings() {
 // ==================================================================
 
 // Write the whole document. setDoc (without "merge") replaces the doc
-// entirely, so it always has exactly these six keys, which is what
-// firestore.rules checks for. serverTimestamp() is a placeholder that
-// Firestore swaps for its own clock time when the write arrives.
+// entirely, so it always has exactly these eight keys, which is what
+// firestore.rules checks for. An older six-key document (from before
+// platform/installed existed) is upgraded by this same full rewrite.
+// platform and installed are worked out fresh on every save rather than
+// remembered, so they always describe this phone right now.
+// serverTimestamp() is a placeholder that Firestore swaps for its own
+// clock time when the write arrives.
 async function saveNow() {
   clearTimeout(saveTimer);
   setStatus("Saving…");
@@ -253,6 +310,8 @@ async function saveNow() {
       playerId: settings.playerId,
       level: settings.level,
       scope: settings.scope,
+      platform: platformKey(),
+      installed: isStandalone(),
       updatedAt: serverTimestamp(),
     });
     setStatus("Saved", "ok");
@@ -499,7 +558,171 @@ document.addEventListener("keydown", (event) => {
 });
 
 // ==================================================================
-// 7. START-UP
+// 7. COPYING TEXT (Copy link, Copy diagnostics)
+// ==================================================================
+
+// Put text on the clipboard. The modern way is navigator.clipboard,
+// but some in-app browsers block it. The fallback (standard practice,
+// if old-fashioned) puts the text in an invisible text box, selects it
+// and uses the older "copy" command. Returns true if either worked.
+// Some browsers leave the modern request hanging instead of refusing
+// it, so it gets 1.5 seconds (Promise.race = whichever finishes first)
+// before falling back.
+async function copyText(text) {
+  try {
+    const giveUp = new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), 1500));
+    await Promise.race([navigator.clipboard.writeText(text), giveUp]);
+    return true;
+  } catch {
+    const box = document.createElement("textarea");
+    box.value = text;
+    box.setAttribute("readonly", "");
+    box.style.position = "fixed";
+    box.style.opacity = "0";
+    document.body.appendChild(box);
+    box.select();
+    let ok = false;
+    try {
+      ok = document.execCommand("copy");
+    } catch {
+      ok = false;
+    }
+    box.remove();
+    return ok;
+  }
+}
+
+// The in-app notice's Copy link button (the notice is built as HTML
+// text, so the button is looked up after it's on the page).
+function wireCopyLink() {
+  const button = document.getElementById("al-copy-link");
+  const status = document.getElementById("al-copy-status");
+  button.addEventListener("click", async () => {
+    const ok = await copyText(PAGE_LINK);
+    status.textContent = ok ? "Copied" : "Couldn't copy. Press and hold the link above to copy it.";
+    status.className = `status-msg ${ok ? "ok" : "error"}`;
+  });
+}
+
+// ==================================================================
+// 8. ANDROID: INSTALL CARD AND TIPS
+// ==================================================================
+
+// Chrome, Samsung Internet and Edge fire "beforeinstallprompt" when the
+// site can be installed. Calling preventDefault() stops the browser's
+// own small install banner (standard practice when a page offers its
+// own Install button), and we keep the event so our button can show the
+// real install dialog later. The event can only be used once.
+let installPrompt = null;
+let justInstalled = false;
+
+window.addEventListener("beforeinstallprompt", (event) => {
+  event.preventDefault();
+  installPrompt = event;
+  renderInstallCard();
+});
+
+// Fired once the app has been installed (from our button or the menu).
+window.addEventListener("appinstalled", () => {
+  installPrompt = null;
+  justInstalled = true;
+  renderInstallCard();
+});
+
+installBtn.addEventListener("click", async () => {
+  if (!installPrompt) return;
+  installPrompt.prompt();
+  await installPrompt.userChoice; // resolves when they tap Install or Cancel
+  installPrompt = null; // used up either way
+  renderInstallCard();
+});
+
+// Manual install steps, per browser (menu names differ).
+function manualInstallSteps() {
+  const back = "<li>Then open <strong>Cup Tracker</strong> from its new icon and come back here (More → Alerts).</li>";
+  switch (browserFamily()) {
+    case "Chrome":
+      return `<li>Tap the <strong>⋮</strong> menu (top right).</li><li>Tap <strong>Install app</strong> or <strong>Add to Home screen</strong>, then <strong>Install</strong>.</li>${back}`;
+    case "Samsung Internet":
+      return `<li>Tap the <strong>≡</strong> menu (bottom right).</li><li>Tap <strong>Add page to</strong>, then <strong>Home screen</strong>.</li>${back}`;
+    case "Firefox":
+      return `<li>Tap the <strong>⋮</strong> menu.</li><li>Tap <strong>Install</strong> or <strong>Add to Home screen</strong>.</li>${back}`;
+    default:
+      return `<li>Open your browser's menu.</li><li>Tap <strong>Install app</strong> or <strong>Add to Home screen</strong>.</li>${back}`;
+  }
+}
+
+// Show the Install card only on Android, in a browser tab (not already
+// installed), on a device that can get alerts. With an install prompt
+// available: the button. Without: the manual steps.
+function renderInstallCard() {
+  const show = isAndroid() && canPush && !isStandalone() && !justInstalled;
+  installCard.hidden = !show;
+  if (!show) return;
+  installBtn.hidden = !installPrompt;
+  installSteps.hidden = Boolean(installPrompt);
+  installSteps.innerHTML = installPrompt ? "" : manualInstallSteps();
+}
+
+// The tips card: every Android device that can get alerts; the Brave
+// line only in Brave.
+function renderAndroidTips() {
+  androidTips.hidden = !(isAndroid() && canPush);
+  braveHint.hidden = !isBrave();
+}
+
+// ==================================================================
+// 9. "CHECK MY SETUP" (only at alerts.html?debug)
+// ==================================================================
+
+// Plain-text summary for troubleshooting. Never includes the whole
+// token: only whether there is one and its last 6 characters, enough
+// to match it against the database without exposing it.
+async function diagnosticsText() {
+  let workerActive = "no";
+  try {
+    const reg = "serviceWorker" in navigator ? await navigator.serviceWorker.getRegistration("/") : null;
+    workerActive = reg?.active ? "yes" : "no";
+  } catch {
+    workerActive = "unknown";
+  }
+  const player = currentPlayer();
+  const yesNo = (b) => (b ? "yes" : "no");
+  return [
+    "Cup Tracker alerts: setup check",
+    `Time: ${new Date().toISOString()}`,
+    `Platform: ${platformKey()} · ${browserFamily()}${isBrave() ? " (Brave)" : ""}${isInAppBrowser() ? " · in-app browser" : ""}`,
+    `Installed: ${yesNo(isStandalone())}`,
+    `Push supported: ${yesNo(canPush)}`,
+    `Permission: ${"Notification" in window ? Notification.permission : "not available"}`,
+    `Service worker active: ${workerActive}`,
+    `Token registered: ${settings.token ? `yes (…${settings.token.slice(-6)})` : "no"}`,
+    `Saved settings: enabled=${settings.enabled}, level=${settings.level}, scope=${settings.scope}, player=${player ? `${player.name} (${player.id})` : settings.playerId || "none"}`,
+  ].join("\n");
+}
+
+async function refreshDiagnostics() {
+  debugText.textContent = await diagnosticsText();
+}
+
+if (DEBUG) {
+  debugCard.hidden = false;
+  // "toggle" fires when the <details> box is opened or closed; refresh
+  // the numbers each time it's opened.
+  debugCard.addEventListener("toggle", () => {
+    if (debugCard.open) refreshDiagnostics();
+  });
+  debugCopy.addEventListener("click", async () => {
+    const text = await diagnosticsText();
+    debugText.textContent = text;
+    const ok = await copyText(text);
+    debugStatus.textContent = ok ? "Copied" : "Couldn't copy. Select the text above instead.";
+    debugStatus.className = `status-msg ${ok ? "ok" : "error"}`;
+  });
+}
+
+// ==================================================================
+// 10. START-UP
 // ==================================================================
 
 async function init() {
@@ -509,10 +732,19 @@ async function init() {
   canPush = await checkDevice();
   if (canPush) messaging = getMessaging();
 
+  // In an in-app browser there's nothing else to load or show.
+  if (isInAppBrowser()) return;
+
+  // Set below: does the saved document need rewriting now? (It's from
+  // before platform/installed existed, or those have changed, e.g. the
+  // app was installed since the last save.)
+  let needsUpgrade = false;
+
   try {
     const user = await ensureSignedIn();
     uid = user.uid;
     const [roster, saved] = await Promise.all([loadPlayers(), loadSettings()]);
+    needsUpgrade = Boolean(saved) && (saved.platform !== platformKey() || saved.installed !== isStandalone());
     players = roster;
 
     // Saved settings if any, otherwise the defaults.
@@ -543,30 +775,39 @@ async function init() {
   if (Notification.permission === "denied") showNotice(DENIED_HTML);
   else hideNotice();
 
-  if (!settings.enabled) return;
+  renderInstallCard();
+  renderAndroidTips();
 
-  // Saved as ON, but the phone no longer allows notifications (turned
-  // off in Settings, or the app was removed and re-added): record that
-  // alerts are off, so the server doesn't keep trying a dead token.
-  if (Notification.permission !== "granted") {
-    settings.enabled = false;
-    settings.token = "";
-    renderSwitch();
-    saveNow().catch(() => {});
-    return;
-  }
+  // At most ONE save happens below, for any of three reasons.
+  let mustSave = needsUpgrade;
 
-  // Still allowed: refresh the token. Browsers and FCM occasionally
-  // replace it; save only if it actually changed.
-  try {
-    const token = await fetchToken();
-    if (token && token !== settings.token) {
-      settings.token = token;
-      await saveNow();
+  if (settings.enabled) {
+    if (Notification.permission !== "granted") {
+      // Saved as ON, but the phone no longer allows notifications
+      // (turned off in Settings, or the app was removed and re-added):
+      // record that alerts are off, so the server doesn't keep trying a
+      // dead token.
+      settings.enabled = false;
+      settings.token = "";
+      renderSwitch();
+      mustSave = true;
+    } else {
+      // Still allowed: refresh the token. Browsers and FCM occasionally
+      // replace it; save only if it actually changed.
+      try {
+        const token = await fetchToken();
+        if (token && token !== settings.token) {
+          settings.token = token;
+          mustSave = true;
+        }
+      } catch (err) {
+        console.warn("Refreshing the push token failed:", err);
+      }
     }
-  } catch (err) {
-    console.warn("Refreshing the push token failed:", err);
   }
+
+  if (mustSave) await saveNow().catch(() => {});
+  if (DEBUG && debugCard.open) refreshDiagnostics();
 }
 
 init();

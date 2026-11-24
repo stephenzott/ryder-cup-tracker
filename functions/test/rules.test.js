@@ -50,12 +50,37 @@ function firestoreAs(uid) {
   return db;
 }
 
-let alice, bob, nobody;
+let alice, bob, carol, nobody;
 before(() => {
   alice = firestoreAs("alice");
   bob = firestoreAs("bob");
+  carol = firestoreAs("carol");
   nobody = firestoreAs(null);
 });
+
+// Plant a document exactly as stage 1 wrote it (six keys, no platform
+// or installed), the way existing phones' documents look in the live
+// database. It's written through the emulator's admin back door
+// ("Bearer owner" skips the rules), since the rules themselves no
+// longer allow writing this old shape.
+async function plantOldSixKeyDoc(uid) {
+  const url = `http://${HOST}:${PORT}/v1/projects/${PROJECT_ID}/databases/${DATABASE_ID}/documents/pushSubscriptions/${uid}`;
+  const res = await fetch(url, {
+    method: "PATCH",
+    headers: { Authorization: "Bearer owner", "Content-Type": "application/json" },
+    body: JSON.stringify({
+      fields: {
+        enabled: { booleanValue: true },
+        token: { stringValue: "old-token" },
+        playerId: { stringValue: "player-1" },
+        level: { stringValue: "segment" },
+        scope: { stringValue: "all" },
+        updatedAt: { timestampValue: "2026-11-23T12:00:00Z" },
+      },
+    }),
+  });
+  assert.equal(res.status, 200);
+}
 
 after(async () => {
   for (const app of apps) {
@@ -85,6 +110,8 @@ function valid(overrides = {}) {
     playerId: "player-1",
     level: "segment",
     scope: "all",
+    platform: "ios",
+    installed: true,
     updatedAt: serverTimestamp(),
     ...overrides,
   };
@@ -117,6 +144,14 @@ test("every allowed level and scope value is accepted", async () => {
   for (const level of ["hole", "segment", "final"]) {
     for (const scope of ["mine", "opposing", "all"]) {
       await setDoc(aliceDoc(alice), valid({ level, scope }));
+    }
+  }
+});
+
+test("every allowed platform value and both installed values are accepted", async () => {
+  for (const platform of ["ios", "android", "other"]) {
+    for (const installed of [true, false]) {
+      await setDoc(aliceDoc(alice), valid({ platform, installed }));
     }
   }
 });
@@ -188,6 +223,65 @@ test("updatedAt set by the phone's own clock is rejected", () =>
 test("updateDoc that adds an extra key is rejected", async () => {
   await setDoc(aliceDoc(alice), valid());
   await denied(updateDoc(aliceDoc(alice), { team: "A", updatedAt: serverTimestamp() }));
+});
+
+test("platform outside the list is rejected", () =>
+  denied(setDoc(aliceDoc(alice), valid({ platform: "windows" }))));
+test("installed as a string is rejected", () =>
+  denied(setDoc(aliceDoc(alice), valid({ installed: "yes" }))));
+
+test("missing platform is rejected", () => {
+  const d = valid();
+  delete d.platform;
+  return denied(setDoc(aliceDoc(alice), d));
+});
+
+test("missing installed is rejected", () => {
+  const d = valid();
+  delete d.installed;
+  return denied(setDoc(aliceDoc(alice), d));
+});
+
+test("old six-key write (stage 1 shape) is now rejected", () => {
+  const d = valid();
+  delete d.platform;
+  delete d.installed;
+  return denied(setDoc(aliceDoc(alice), d));
+});
+
+// ==================================================================
+// OLD SIX-KEY DOCUMENTS ALREADY IN THE DATABASE
+// ==================================================================
+
+const carolDoc = (db) => doc(db, "pushSubscriptions", "carol");
+
+test("an existing six-key document is still readable by its owner", async () => {
+  await plantOldSixKeyDoc("carol");
+  const snap = await getDoc(carolDoc(carol));
+  assert.equal(snap.data().token, "old-token");
+  assert.equal(snap.data().platform, undefined);
+});
+
+test("an existing six-key document is still private from others", async () => {
+  await plantOldSixKeyDoc("carol");
+  await denied(getDoc(carolDoc(bob)));
+});
+
+test("a partial update that leaves it at six keys is rejected", async () => {
+  await plantOldSixKeyDoc("carol");
+  await denied(updateDoc(carolDoc(carol), { level: "hole", updatedAt: serverTimestamp() }));
+});
+
+test("the page's full eight-key rewrite upgrades it", async () => {
+  await plantOldSixKeyDoc("carol");
+  await allowed(setDoc(carolDoc(carol), valid({ platform: "android", installed: false })));
+  const snap = await getDoc(carolDoc(carol));
+  assert.equal(snap.data().platform, "android");
+});
+
+test("an existing six-key document can still be deleted by its owner", async () => {
+  await plantOldSixKeyDoc("carol");
+  await allowed(deleteDoc(carolDoc(carol)));
 });
 
 // ==================================================================

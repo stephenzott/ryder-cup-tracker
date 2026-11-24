@@ -3314,13 +3314,8 @@ th.lb-num {
   box-shadow: var(--shadow-card);
 }
 
-/* Card headings ("Who are you?", "What to send", "Whose scores").
-   For the two radio groups this is a <legend>; float + width:100% is
-   the standard trick that makes a legend sit INSIDE its card like a
-   normal heading instead of cutting through the card's top border. */
+/* Card headings ("Who are you?", "What to send", "Install the app"...). */
 .al-card-title {
-  float: left;
-  width: 100%;
   margin: 0 0 var(--space-2);
   padding: 0;
   font-family: var(--font-display);
@@ -3330,8 +3325,18 @@ th.lb-num {
   letter-spacing: 0.02em;
 }
 
+/* For the two radio groups the heading is a <legend>. float +
+   width:100% is the standard trick that makes a legend sit INSIDE its
+   card like a normal heading instead of cutting through the card's top
+   border. Only legends get it: on ordinary headings a float would let
+   the next element squeeze in beside it. */
+legend.al-card-title {
+  float: left;
+  width: 100%;
+}
+
 /* The float above must not let the next element wrap beside it. */
-.al-card-title + * {
+legend.al-card-title + * {
   clear: both;
 }
 
@@ -3509,4 +3514,102 @@ input[type="checkbox"].al-switch:disabled {
 
 .al-info-text[hidden] {
   display: none;
+}
+
+/* --- Stage 1b additions: in-app notice, Android cards, debug card --- */
+
+/* A paragraph of explanation inside a card. */
+.al-card-text {
+  margin: 0 0 var(--space-3);
+  font-size: 0.95rem;
+}
+
+/* The page link shown in the in-app-browser notice. It can be very
+   long with no spaces, so allow breaking anywhere rather than letting
+   it push the page wider than the phone. */
+.al-link {
+  padding: var(--space-2) var(--space-3);
+  background: var(--bg);
+  border-radius: var(--radius-small);
+  font-size: 0.9rem;
+  overflow-wrap: anywhere;
+  user-select: all;   /* one long-press selects the whole link */
+}
+
+/* "Install Cup Tracker": full width, so it's an easy target. */
+.al-install-btn {
+  width: 100%;
+}
+
+.al-install-btn[hidden],
+.al-steps[hidden] {
+  display: none;
+}
+
+/* Collapsible hint ("Alerts arriving late?"). The <summary> is the
+   tappable line; padding makes it a 44px-tall target. */
+.al-details summary {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  font-weight: 600;
+  color: var(--navy);
+  cursor: pointer;
+}
+
+.al-details p {
+  margin: 0 0 var(--space-2);
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+/* "Check my setup" (only at alerts.html?debug). */
+.al-debug[hidden] {
+  display: none;
+}
+
+.al-debug-summary {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.2rem;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+}
+
+/* The diagnostics text: monospace (each character the same width) is
+   the usual style for copy-paste technical text. pre-wrap keeps the
+   line breaks but still wraps long lines instead of scrolling sideways. */
+.al-debug-text {
+  margin: var(--space-2) 0 var(--space-3);
+  padding: var(--space-3);
+  background: var(--bg);
+  border-radius: var(--radius-small);
+  font-size: 0.8rem;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* Collapsible rows ("Alerts arriving late?", "Check my setup"): making
+   the <summary> a flex row hides the browser's own ▸ arrow, so draw our
+   own: ▸ when closed, ▾ when open, so it's clear the line can be tapped. */
+.al-details summary::-webkit-details-marker,
+.al-debug-summary::-webkit-details-marker {
+  display: none;
+}
+
+.al-details summary::before,
+.al-debug-summary::before {
+  content: "▸";
+  width: 1.2em;
+  flex-shrink: 0;
+  color: var(--navy);
+}
+
+.al-details[open] > summary::before,
+.al-debug[open] > .al-debug-summary::before {
+  content: "▾";
 }

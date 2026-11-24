@@ -17,7 +17,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Inter:wght@400;500;600&display=swap" />
   <title>Alerts — Ryder Cup Trip</title>
-  <link rel="stylesheet" href="css/style.css?v=13" />
+  <link rel="stylesheet" href="css/style.css?v=14" />
 </head>
 <body>
   <!-- Push-notification settings for THIS phone/browser. Everything
@@ -67,6 +67,31 @@
       <!-- "Saved" / error messages. aria-live="polite" makes screen
            readers announce changes without interrupting. -->
       <p class="al-status status-msg" id="al-status" aria-live="polite"></p>
+    </section>
+
+    <!-- Android only: "Install the app". alerts.js shows it on Android
+         when the site is NOT already running as an installed app. The
+         Install button appears only if the browser offers its own
+         install prompt (Chrome, Samsung Internet, Edge); otherwise the
+         manual steps (filled in per browser) are shown instead. -->
+    <section class="al-card" id="al-install-card" aria-labelledby="al-install-title" hidden>
+      <h2 class="al-card-title" id="al-install-title">Install the app (recommended)</h2>
+      <p class="al-card-text">Chrome can remove notification permission from websites people rarely open, but not from installed apps. Installing Cup Tracker keeps your alerts coming.</p>
+      <button type="button" class="al-install-btn" id="al-install-btn" hidden>Install Cup Tracker</button>
+      <ol class="al-steps" id="al-install-steps"></ol>
+    </section>
+
+    <!-- Android only: tips that matter whether or not the app is
+         installed. The Brave line is shown only in Brave. -->
+    <section class="al-card" id="al-android-tips" aria-labelledby="al-tips-title" hidden>
+      <h2 class="al-card-title" id="al-tips-title">Android tips</h2>
+      <p class="al-card-text" id="al-brave-hint" hidden><strong>Using Brave?</strong> If alerts don't arrive, open Brave's <strong>Settings → Privacy and security</strong>, look for a setting like <strong>“Use Google services for push messaging”</strong> and turn it on.</p>
+      <!-- <details>/<summary> is the browser's built-in "click to expand"
+           box: collapsed by default, opens on tap, no script needed. -->
+      <details class="al-details">
+        <summary>Alerts arriving late?</summary>
+        <p>Android may hold back notifications to save battery. Open the phone's <strong>Settings → Apps</strong>, pick your browser (or <strong>Cup Tracker</strong> if you installed it), tap <strong>Battery</strong> and choose <strong>Unrestricted</strong>.</p>
+      </details>
     </section>
 
     <!-- 4. Level. Each option: radio + label, an ⓘ button, and a short
@@ -119,6 +144,16 @@
   </fieldset>
 
   <p class="st-note">Settings are saved for this phone only. On another phone, set them up there too.</p>
+
+  <!-- Troubleshooting card, only when the address ends in ?debug
+       (alerts.html?debug). Collapsed until tapped. Shows only the last
+       6 characters of the push token, never the whole thing. -->
+  <details class="al-card al-debug" id="al-debug" hidden>
+    <summary class="al-debug-summary">Check my setup</summary>
+    <pre class="al-debug-text" id="al-debug-text">Loading…</pre>
+    <button type="button" class="secondary" id="al-debug-copy">Copy diagnostics</button>
+    <span class="status-msg" id="al-debug-status" aria-live="polite"></span>
+  </details>
 
   <script type="module" src="js/nav.js?v=4"></script>
   <script type="module" src="js/alerts.js"></script>

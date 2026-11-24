@@ -133,18 +133,24 @@ service cloud.firestore {
         return request.auth != null && request.auth.uid == uid;
       }
 
-      // The shape every write must have: exactly these six keys, each
-      // of the right type, level/scope from the allowed lists, and
-      // updatedAt set to the server's clock (serverTimestamp() in the
-      // app arrives here as request.time), so it can't be faked.
+      // The shape every write must have: exactly these eight keys, each
+      // of the right type, level/scope/platform from the allowed lists,
+      // and updatedAt set to the server's clock (serverTimestamp() in
+      // the app arrives here as request.time), so it can't be faked.
+      // Older six-key documents (from before platform/installed) are
+      // still readable (reads don't check the shape); any new write must
+      // be the full eight-key shape, so the page upgrades them when it
+      // next saves.
       function validSubscription(d) {
-        return d.keys().hasOnly(['enabled', 'token', 'playerId', 'level', 'scope', 'updatedAt'])
-          && d.keys().hasAll(['enabled', 'token', 'playerId', 'level', 'scope', 'updatedAt'])
+        return d.keys().hasOnly(['enabled', 'token', 'playerId', 'level', 'scope', 'platform', 'installed', 'updatedAt'])
+          && d.keys().hasAll(['enabled', 'token', 'playerId', 'level', 'scope', 'platform', 'installed', 'updatedAt'])
           && d.enabled is bool
           && d.token is string && d.token.size() < 4096
           && d.playerId is string
           && d.level in ['hole', 'segment', 'final']
           && d.scope in ['mine', 'opposing', 'all']
+          && d.platform in ['ios', 'android', 'other']
+          && d.installed is bool
           && d.updatedAt == request.time;
       }
 
