@@ -11,7 +11,8 @@
     "sync": "node scripts/sync.js",
     "test": "npm run sync && node --test test/events.test.js",
     "test:rules": "firebase emulators:exec --only firestore --project demo-ryder-rules \"node --test test/rules.test.js\"",
-    "rehearse": "npm run sync && MOCK_PUSH_LOG=\"$PWD/.rehearsal-pushes.jsonl\" firebase emulators:exec --only firestore,functions --project demo-ryder-rehearsal \"node test/rehearsal.mjs\""
+    "rehearse": "npm run sync && MOCK_PUSH_LOG=\"$PWD/.rehearsal-pushes.jsonl\" firebase emulators:exec --only firestore,functions --project demo-ryder-rehearsal \"node test/rehearsal.mjs\"",
+    "check-offline": "node scripts/check-offline.js"
   },
   "dependencies": {
     "firebase-admin": "^14.5.1",

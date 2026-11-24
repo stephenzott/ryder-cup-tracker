@@ -3718,3 +3718,26 @@ body.has-offline-banner {
   min-width: 56px;
   min-height: 44px;
 }
+
+/* --- "Ready for offline" line at the bottom of the More menu ---
+   (offline project, stage 2; filled in by js/offline-ready.js).
+   Small and quiet like a footnote, separated from the menu links by
+   a hairline. Muted when not ready, green when ready. */
+.offline-status {
+  max-width: 220px;
+  margin: var(--space-1) 0 0;
+  padding: var(--space-2) var(--space-4) var(--space-1);
+  border-top: 1px solid var(--border);
+  font-size: 0.8rem;
+  line-height: 1.35;
+  color: var(--muted);
+}
+
+.offline-status:empty {
+  display: none;
+}
+
+.offline-status.is-ready {
+  color: var(--ok);
+  font-weight: 600;
+}

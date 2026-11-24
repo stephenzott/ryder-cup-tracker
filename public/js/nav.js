@@ -128,7 +128,11 @@ function buildNavHtml(page) {
           return `<a href="${item.href}"${here ? ' class="is-active" aria-current="page"' : ""}>${item.label}</a>`;
         })
         .join("");
-      popoversHtml += `<div class="tab-popover" id="${popoverId}" hidden>${links}</div>`;
+      // Offline project, stage 2: the More menu ends with a one-line
+      // "Ready for offline" status, filled in by js/offline-ready.js.
+      // role="status" lets screen readers announce it when it changes.
+      const extra = tab.id === "more" ? `<p class="offline-status" id="offline-status" role="status"></p>` : "";
+      popoversHtml += `<div class="tab-popover" id="${popoverId}" hidden>${links}${extra}</div>`;
     }
   }
 
@@ -237,3 +241,30 @@ initNav();
 // the top of this file would not guarantee.
 // ------------------------------------------------------------------
 import("./connection.js").catch((err) => console.warn("nav.js: offline banner unavailable", err));
+
+// ------------------------------------------------------------------
+// Offline project, stage 2: install the service worker on EVERY page,
+// so the app's files get stored for offline use no matter which page
+// someone opens first. It's the same worker the Alerts page registers
+// for push notifications (same file, same scope "/"): registering it
+// twice is harmless, the browser just keeps the one registration.
+// Registering does NOT ask for notification permission; that still
+// only happens when someone taps the switch on the Alerts page.
+//
+// We wait for the page's "load" event so the worker's downloads don't
+// compete with the page's own first load.
+// ------------------------------------------------------------------
+function registerServiceWorker() {
+  navigator.serviceWorker
+    .register("/firebase-messaging-sw.js", { scope: "/" })
+    .catch((err) => console.warn("nav.js: service worker registration failed", err));
+}
+if ("serviceWorker" in navigator) {
+  if (document.readyState === "complete") registerServiceWorker();
+  else window.addEventListener("load", registerServiceWorker);
+}
+
+// The "Ready for offline" line in the More menu + the hourly data
+// warm-up (see js/offline-ready.js). Loaded the same safe way as the
+// banner above.
+import("./offline-ready.js").catch((err) => console.warn("nav.js: offline status unavailable", err));
