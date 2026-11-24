@@ -1,3 +1,44 @@
+## Ground rules for the offline + score-log project (apply to every step)
+
+1. Never run `firebase deploy` (hosting, functions, rules, indexes), never
+   write to the live Firestore, and never send a real push notification.
+   Test only with the Firebase emulators, using the named database
+   `ryder-cup-tracker`. I deploy myself; at the end of each stage give me an
+   exact numbered checklist of what to run.
+2. Never lose a score. Assume phones spend long stretches with NO signal,
+   and that the first visit of each day is probably on hotel wifi. Saving a
+   hole must never wait on the network before letting the player move on.
+   Nothing may delete or overwrite existing score data unless I asked for it.
+3. Allowed to change: firebase-init.js (cache settings), the save flow in
+   round.js, nav.js (registering the service worker on every page),
+   firebase-messaging-sw.js (adding offline caching ALONGSIDE the push code),
+   admin.html/admin.js (new sections), and new files of your own (for
+   example js/connection.js). Allowed to add a new Firestore collection
+   with rules for ONLY that collection.
+   Do NOT change: scoring.js, rounds-config.js, the existing rules for
+   unlocks/players/rounds/matches, the sign-in flows in auth.js, or the look
+   or class names of existing elements, unless you first explain exactly
+   what and why, and I say yes.
+4. Push notifications must keep working exactly as they do now. Any edit to
+   the service worker must leave the push and notificationclick behavior
+   identical, and every push must still show a visible notification
+   immediately.
+5. The website stays plain HTML/CSS/JS with no build step, loading Firebase
+   modules from gstatic. Only functions/ uses Node and npm.
+6. Reuse, don't rewrite: score logic from scoring.js, team helpers from
+   match-ui.js, styling from the existing tokens and classes in style.css.
+7. Cost safety for any Cloud Function: never write to a document it
+   listens to, tolerate being called twice for the same event, low
+   maxInstances, no loops or uncapped retries.
+8. Both platforms: iPhone (iOS 16.4+ Home Screen app, and Safari) and
+   Android (Chrome first, then Samsung Internet and Firefox).
+9. Phone first, comment generously (strong math background, little
+   software-engineering experience), show your plan checklist before
+   changing anything, and ask me about any decision I haven't already made
+   instead of picking silently.
+
+## Notifications rules (finished, do NOT apply to current work)
+
 Ground rules for the notifications project (apply to every step):
 
 1. Never run `firebase deploy` (hosting, functions, rules, indexes), never write to the live Firestore, and never send a real push notification. Test only with the Firebase emulators, using the named database `ryder-cup-tracker` (not "(default)"). I deploy myself; at the end of each stage give me an exact numbered checklist of what to run.
