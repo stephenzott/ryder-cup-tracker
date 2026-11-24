@@ -283,7 +283,13 @@ export const notifyOnMatchUpdate = onDocumentUpdated(
 // subscription only (their uid comes from their sign-in, so nobody can
 // push to anyone else). Errors are HttpsError, whose message the page
 // shows as-is.
-export const sendTestNotification = onCall(async (request) => {
+//
+// invoker: "public" lets Google's front door (Cloud Run) pass calls
+// through to this code, which is how every callable function works: the
+// real check is the Firebase sign-in test just below, not Cloud Run's.
+// Without it, a deploy that fails partway can leave the function
+// rejecting every call before our code runs.
+export const sendTestNotification = onCall({ invoker: "public" }, async (request) => {
   // 1. Signed in? (Every visitor is signed in anonymously by the site.)
   const uid = request.auth?.uid;
   if (!uid) throw new HttpsError("unauthenticated", "Please reload the page and try again.");

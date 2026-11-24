@@ -68,6 +68,18 @@ you to confirm. **If it fails with a permissions error about the Firestore
 trigger (Eventarc), wait a few minutes and run the same command again.**
 That's normal on a project's first trigger.
 
+**If the test button (step 8) says just "internal"**, the function's "anyone
+may call" permission didn't get set during the deploy (this happened on the
+first deploy here; the function's logs say "The request was not
+authenticated"). Add it once, with Google's `gcloud` tool:
+
+```
+gcloud run services add-iam-policy-binding sendtestnotification --region=us-central1 --project=golf-tracker-data --member=allUsers --role=roles/run.invoker
+```
+
+That's the normal setting for a Firebase callable function: the code itself
+checks the caller's sign-in and only sends to their own phone.
+
 **If you have to wait before retrying, do step 6 (hosting) first** and come
 back to this step. The two are independent, and the live Alerts page can't
 save settings until step 6 is done (see the note under step 4).
