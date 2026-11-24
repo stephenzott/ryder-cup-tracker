@@ -3613,3 +3613,18 @@ input[type="checkbox"].al-switch:disabled {
 .al-debug[open] > .al-debug-summary::before {
   content: "▾";
 }
+
+/* --- Stage 2: "Send me a test notification" (inside the switch card) --- */
+.al-test {
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border);
+}
+
+.al-test[hidden] {
+  display: none;
+}
+
+.al-test-btn {
+  width: 100%;
+}

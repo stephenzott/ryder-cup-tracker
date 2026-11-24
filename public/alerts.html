@@ -17,7 +17,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Inter:wght@400;500;600&display=swap" />
   <title>Alerts — Ryder Cup Trip</title>
-  <link rel="stylesheet" href="css/style.css?v=14" />
+  <link rel="stylesheet" href="css/style.css?v=15" />
 </head>
 <body>
   <!-- Push-notification settings for THIS phone/browser. Everything
@@ -67,6 +67,12 @@
       <!-- "Saved" / error messages. aria-live="polite" makes screen
            readers announce changes without interrupting. -->
       <p class="al-status status-msg" id="al-status" aria-live="polite"></p>
+      <!-- Only shown while alerts are on (alerts.js). Asks the server to
+           send one test push to this phone; usable once a minute. -->
+      <div class="al-test" id="al-test" hidden>
+        <button type="button" class="secondary al-test-btn" id="al-test-btn">Send me a test notification</button>
+        <p class="al-status status-msg" id="al-test-status" aria-live="polite"></p>
+      </div>
     </section>
 
     <!-- Android only: "Install the app". alerts.js shows it on Android

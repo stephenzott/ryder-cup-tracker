@@ -38,6 +38,12 @@ import {
   setDoc,
 } from "https://www.gstatic.com/firebasejs/11.3.1/firebase-firestore.js";
 import { connectAuthEmulator } from "https://www.gstatic.com/firebasejs/11.3.1/firebase-auth.js";
+// Cloud Functions client, for the "Send me a test notification" button.
+import {
+  connectFunctionsEmulator,
+  getFunctions,
+  httpsCallable,
+} from "https://www.gstatic.com/firebasejs/11.3.1/firebase-functions.js";
 import {
   deleteToken,
   getMessaging,
@@ -86,9 +92,18 @@ const VAPID_KEY_IS_SET = !VAPID_PUBLIC_KEY.startsWith("PASTE_");
 // sends nothing.)
 // ------------------------------------------------------------------
 const IS_LOCAL = ["localhost", "127.0.0.1"].includes(location.hostname);
+
+// The Cloud Functions handle. The region must match where the functions
+// are deployed (functions/index.js: us-central1). db.app is the same
+// Firebase app firebase-init.js set up, so firebase-init.js needn't change.
+const functions = getFunctions(db.app, "us-central1");
+
 if (IS_LOCAL) {
   connectFirestoreEmulator(db, "127.0.0.1", 8080);
   connectAuthEmulator(auth, "http://127.0.0.1:9099", { disableWarnings: true });
+  // Locally, the test button calls the functions emulator, whose mock
+  // sender only logs (it can never reach real FCM).
+  connectFunctionsEmulator(functions, "127.0.0.1", 5001);
 }
 
 // The defaults for a phone that has never saved anything.
@@ -110,6 +125,9 @@ const statusEl = document.getElementById("al-status");
 const myTeamNameEl = document.getElementById("al-my-team-name");
 const levelInputs = [...document.querySelectorAll('input[name="level"]')];
 const scopeInputs = [...document.querySelectorAll('input[name="scope"]')];
+const testBox = document.getElementById("al-test");
+const testBtn = document.getElementById("al-test-btn");
+const testStatus = document.getElementById("al-test-status");
 const installCard = document.getElementById("al-install-card");
 const installBtn = document.getElementById("al-install-btn");
 const installSteps = document.getElementById("al-install-steps");
@@ -423,6 +441,9 @@ function renderSwitch() {
     enabledInput.disabled = false;
     enabledHint.textContent = settings.enabled ? "On for this phone." : "Off.";
   }
+
+  // The test button only makes sense while alerts are on.
+  testBox.hidden = !(canPush && settings.enabled);
 }
 
 function renderRadios() {
@@ -531,6 +552,40 @@ async function turnOff() {
   }
   renderSwitch();
 }
+
+// ------------------------------------------------------------------
+// "Send me a test notification". httpsCallable wraps the server
+// function sendTestNotification (functions/index.js) so it can be
+// called like an ordinary async function; the server knows who's
+// calling from this browser's sign-in and only sends to THIS phone.
+// The button is disabled for a minute after every tap, matching the
+// server's once-a-minute limit.
+// ------------------------------------------------------------------
+const sendTest = httpsCallable(functions, "sendTestNotification");
+const TEST_COOLDOWN_MS = 60 * 1000;
+
+function setTestStatus(text, kind = "") {
+  testStatus.textContent = text;
+  testStatus.className = `al-status status-msg${kind ? ` ${kind}` : ""}`;
+}
+
+testBtn.addEventListener("click", async () => {
+  testBtn.disabled = true;
+  setTimeout(() => (testBtn.disabled = false), TEST_COOLDOWN_MS);
+  setTestStatus("Sending…");
+  try {
+    await sendTest();
+    setTestStatus("Sent. Check your lock screen.", "ok");
+  } catch (err) {
+    console.error("Test notification failed:", err);
+    // The server's own error messages (paused, turn alerts on first,
+    // wait a minute, registration expired) are written for people, so
+    // show them as-is. Anything else (offline, server error) gets a
+    // general message.
+    const known = ["functions/failed-precondition", "functions/resource-exhausted", "functions/unauthenticated", "functions/internal"];
+    setTestStatus(known.includes(err.code) && err.message ? err.message : "Couldn't send the test. Check your connection and try again in a minute.", "error");
+  }
+});
 
 // ------------------------------------------------------------------
 // The ⓘ buttons. Each toggles the explanation right below its option.

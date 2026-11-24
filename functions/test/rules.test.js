@@ -285,6 +285,24 @@ test("an existing six-key document can still be deleted by its owner", async () 
 });
 
 // ==================================================================
+// SERVER-ONLY COLLECTIONS (used by the Cloud Function, no client rules)
+// No rule mentions them, so Firestore's default applies: deny all.
+// ==================================================================
+
+for (const [name, docId] of [
+  ["notificationLog", "round1_match1_hole7"],
+  ["notificationConfig", "global"],
+  ["testPushLimits", "alice"], // even "your own" uid's document
+]) {
+  test(`${name}: a signed-in browser cannot read`, () => denied(getDoc(doc(alice, name, docId))));
+  test(`${name}: a signed-in browser cannot write`, () =>
+    denied(setDoc(doc(alice, name, docId), { enabled: true })));
+  test(`${name}: a signed-in browser cannot delete`, () => denied(deleteDoc(doc(alice, name, docId))));
+  test(`${name}: not signed in cannot read`, () => denied(getDoc(doc(nobody, name, docId))));
+  test(`${name}: nobody can list it`, () => denied(getDocs(collection(alice, name))));
+}
+
+// ==================================================================
 // EXISTING RULES STILL BEHAVE AS BEFORE (spot checks)
 // ==================================================================
 

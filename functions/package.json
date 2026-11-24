@@ -1,10 +1,20 @@
 {
   "name": "ryder-cup-functions",
   "private": true,
-  "description": "Server-side code for the Ryder Cup tracker (push notifications, stage 2) and its tests. The website itself does not use npm.",
+  "description": "Cloud Functions for the Ryder Cup tracker (score alerts) and their tests. The website itself does not use npm.",
   "type": "module",
+  "main": "index.js",
+  "engines": {
+    "node": "24"
+  },
   "scripts": {
-    "test:rules": "firebase emulators:exec --only firestore --project demo-ryder-rules \"node --test test/*.test.js\""
+    "sync": "node scripts/sync.js",
+    "test": "npm run sync && node --test test/events.test.js",
+    "test:rules": "firebase emulators:exec --only firestore --project demo-ryder-rules \"node --test test/rules.test.js\""
+  },
+  "dependencies": {
+    "firebase-admin": "^14.5.1",
+    "firebase-functions": "^7.4.0"
   },
   "devDependencies": {
     "firebase": "11.3.1"

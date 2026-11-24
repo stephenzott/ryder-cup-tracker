@@ -17,3 +17,9 @@ ui-debug.log
 
 # Node (in case any tooling gets added later)
 node_modules/
+
+# Copies of public/js/scoring.js and rounds-config.js (and the trip year) made by
+# `npm run sync` in functions/ (edit the originals in public/js/)
+functions/scoring.js
+functions/rounds-config.js
+functions/trip-year.js

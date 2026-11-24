@@ -5,7 +5,7 @@ Ground rules for the notifications project (apply to every step):
 3. The website stays plain HTML/CSS/JS with no build step, loading Firebase modules from gstatic as it does today. Only the functions/ folder uses Node and npm.
 4. Reuse, don't rewrite: all score logic comes from scoring.js, team helpers from match-ui.js (teamKey, teamName, teamPillHtml, avatarHtml, formatPoints), styling from the existing tokens and classes in style.css.
 5. Cost safety: a function must never write to a document it listens to; it must tolerate being called twice for the same event; set a low maxInstances; delete dead notification tokens; no loops or uncapped retries.
-6. iOS web push only works for a site added to the Home Screen (iOS 16.4+), and notification permission must be requested from a direct user tap. Every push the service worker receives must show a visible notification, because iOS can revoke permission otherwise.
+6. Both platforms must work. iPhone/iPad: iOS/iPadOS 16.4+ Home Screen web apps only (permission must be requested from a direct tap; Safari is the recommended browser). Android: Chrome primarily, plus Samsung Internet and Firefox, from a normal tab or installed. On both, every push the service worker receives must show a visible notification immediately, including when the app is open, because iOS can revoke permission otherwise.
 7. Phone first, comment generously (I have a strong math background, little software-engineering experience), show your plan checklist before changing anything, and ask me about any decision I haven't already made instead of picking silently.
 
 ## Restyle rules (finished, do NOT apply to current work)
