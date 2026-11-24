@@ -3218,3 +3218,295 @@ th.lb-num {
 .rd-admin-link[hidden] {
   display: none;
 }
+
+/* ==================================================================
+   12. ALERTS PAGE  (alerts.html; built by js/alerts.js)
+   Push-notification settings. Reuses the navy .page-header, the base
+   button/select styles and the team pill; these are the extras.
+   ================================================================== */
+
+/* --- Help box at the top (Add to Home Screen, unsupported, blocked) ---
+   A white card with a navy stripe on the left, so it reads as
+   "information" without borrowing a team color. */
+.al-notice {
+  margin-top: var(--space-4);
+  padding: var(--space-4);
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--navy);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+}
+
+/* The [hidden] attribute normally hides an element, but any `display`
+   set in CSS overrides it; this keeps hidden meaning hidden. */
+.al-notice[hidden] {
+  display: none;
+}
+
+.al-notice p {
+  margin: var(--space-2) 0 0;
+}
+
+.al-notice-title {
+  margin: 0;
+  font-size: 1.2rem;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+/* Numbered steps, with a little extra space so each reads on its own. */
+.al-steps {
+  margin: var(--space-2) 0 0;
+  padding-left: var(--space-5);
+}
+
+.al-steps li {
+  margin: var(--space-2) 0;
+}
+
+.al-notice-small {
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+/* The little Share icon drawn inline in step 1, sized to the text. */
+.al-share-icon {
+  width: 1.1em;
+  height: 1.1em;
+  vertical-align: -0.15em;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* --- The settings wrapper ---
+   A <fieldset> is used only so the whole group can be disabled at
+   once; browsers draw a border and padding around fieldsets by
+   default, which we remove so it's invisible. min-width: 0 fixes an
+   old browser quirk where fieldsets refuse to shrink below their
+   content's width (which could cause sideways scrolling on a phone). */
+.al-settings,
+.al-group {
+  min-width: 0;
+  margin: 0;
+  border: 0;
+}
+
+.al-settings {
+  padding: 0;
+}
+
+/* While disabled (loading, or a device that can't get alerts), fade it. */
+.al-settings:disabled {
+  opacity: 0.55;
+}
+
+/* --- Cards: one per section, stacked with a gap --- */
+.al-card {
+  margin-top: var(--space-4);
+  padding: var(--space-4);
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+}
+
+/* Card headings ("Who are you?", "What to send", "Whose scores").
+   For the two radio groups this is a <legend>; float + width:100% is
+   the standard trick that makes a legend sit INSIDE its card like a
+   normal heading instead of cutting through the card's top border. */
+.al-card-title {
+  float: left;
+  width: 100%;
+  margin: 0 0 var(--space-2);
+  padding: 0;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.2rem;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+/* The float above must not let the next element wrap beside it. */
+.al-card-title + * {
+  clear: both;
+}
+
+/* The name dropdown fills the card's width. */
+#al-player {
+  width: 100%;
+}
+
+.al-team {
+  margin-top: var(--space-2);
+}
+
+.al-team:empty {
+  display: none;
+}
+
+.al-team-note {
+  margin: var(--space-2) 0 0;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+/* --- Master switch row ---
+   Text on the left, the switch on the right; the whole row is the
+   tappable <label>, at least 44px tall. */
+.al-switch-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-height: 44px;
+  cursor: pointer;
+}
+
+.al-switch-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.al-switch-label {
+  font-weight: 600;
+}
+
+.al-switch-hint {
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+/* The switch itself: a checkbox restyled as a sliding pill.
+   appearance: none removes the browser's own tick-box drawing so we
+   can draw our own: the input is the grey track, and its ::before
+   "pseudo-element" (a box CSS adds without any extra HTML) is the
+   white knob. When checked, the track turns navy and the knob slides
+   right. (The double selector outranks the generic checkbox rule in
+   section 2, which would otherwise shrink it to 20px.) */
+input[type="checkbox"].al-switch {
+  appearance: none;
+  -webkit-appearance: none;
+  flex-shrink: 0;
+  position: relative;
+  width: 52px;
+  height: 32px;
+  margin: 0;
+  border-radius: var(--radius-pill);
+  background: var(--halved);
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+input[type="checkbox"].al-switch::before {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--card);
+  box-shadow: 0 1px 3px rgba(15, 27, 45, 0.3);
+  transition: transform 0.2s;
+}
+
+input[type="checkbox"].al-switch:checked {
+  background: var(--navy);
+}
+
+input[type="checkbox"].al-switch:checked::before {
+  transform: translateX(20px);
+}
+
+input[type="checkbox"].al-switch:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* People who've asked their phone for less motion: no sliding. */
+@media (prefers-reduced-motion: reduce) {
+  input[type="checkbox"].al-switch,
+  input[type="checkbox"].al-switch::before {
+    transition: none;
+  }
+}
+
+/* The "Saved" line. The shared .status-msg adds a left margin meant
+   for sitting beside a button; here it sits on its own line. */
+.al-status {
+  margin: var(--space-1) 0 0;
+  min-height: 1.35em;   /* reserve the line so the card doesn't jump */
+}
+
+/* --- Radio options ---
+   A two-column grid per option: [radio + label] [ⓘ button], with the
+   explanation spanning both columns underneath when it's open. */
+.al-option {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 44px;
+  align-items: center;
+  border-top: 1px solid var(--border);
+}
+
+/* No divider above the first option (the heading is there). */
+.al-card-title + .al-option {
+  border-top: 0;
+}
+
+.al-option-label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 44px;
+  cursor: pointer;
+}
+
+/* An option that can't be chosen right now (My team / Opposing for a
+   player without a team). */
+.al-option.is-disabled .al-option-label {
+  color: var(--muted);
+  cursor: not-allowed;
+}
+
+/* The ⓘ button: a 44x44 tap target with no fill, overriding the
+   site's navy button style. */
+.al-info {
+  width: 44px;
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--navy);
+  font-size: 1.3rem;
+  line-height: 1;
+}
+
+.al-info:hover,
+.al-info:disabled,
+.al-info:disabled:hover {
+  background: transparent;
+  border: 0;
+}
+
+.al-info[aria-expanded="true"] {
+  color: var(--navy-hover);
+}
+
+/* The explanation under an option. */
+.al-info-text {
+  grid-column: 1 / -1;
+  margin: 0 0 var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  font-size: 0.9rem;
+  color: var(--muted);
+  background: var(--bg);
+  border-radius: var(--radius-small);
+}
+
+.al-info-text[hidden] {
+  display: none;
+}

@@ -48,7 +48,7 @@ const PLAYER_NAME_STORAGE_KEY = "rydercup_unlock_player_name";
 // kicking off their own.
 let signInPromise = null;
 
-function ensureSignedIn() {
+export function ensureSignedIn() {
   if (!signInPromise) {
     signInPromise = new Promise((resolve, reject) => {
       // onAuthStateChanged fires once immediately with whatever the

@@ -1,0 +1,12 @@
+{
+  "name": "ryder-cup-functions",
+  "private": true,
+  "description": "Server-side code for the Ryder Cup tracker (push notifications, stage 2) and its tests. The website itself does not use npm.",
+  "type": "module",
+  "scripts": {
+    "test:rules": "firebase emulators:exec --only firestore --project demo-ryder-rules \"node --test test/*.test.js\""
+  },
+  "devDependencies": {
+    "firebase": "11.3.1"
+  }
+}

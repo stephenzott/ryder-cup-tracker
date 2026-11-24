@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0B1F3A" />
+  <!-- Home Screen app support (see manifest.webmanifest): lets the site
+       be added to a phone's Home Screen and open full-screen like an app,
+       which iPhones require before they allow push notifications. -->
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="Cup Tracker" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Inter:wght@400;500;600&display=swap" />
+  <title>Alerts — Ryder Cup Trip</title>
+  <link rel="stylesheet" href="css/style.css?v=13" />
+</head>
+<body>
+  <!-- Push-notification settings for THIS phone/browser. Everything
+       below is wired up by js/alerts.js; the ids are what it looks up.
+       Styles are in style.css section 12 (class names start with "al-"). -->
+
+  <header class="page-header">
+    <p class="page-eyebrow">Alerts</p>
+    <h1 class="page-title">Score alerts</h1>
+    <p class="page-sub">Get a notification on this phone when scores come in.</p>
+  </header>
+
+  <!-- 1. Install helper. Hidden unless alerts.js finds a problem it has
+       to explain (iPhone not opened from the Home Screen, a browser
+       without push support, or notifications blocked in Settings). -->
+  <section class="al-notice" id="al-notice" role="status" hidden></section>
+
+  <!-- Everything below sits in one <fieldset>, so alerts.js can switch
+       the whole lot off in one go (fieldset.disabled disables every
+       control inside it) when this device can't receive alerts. -->
+  <fieldset class="al-settings" id="al-settings">
+    <legend class="visually-hidden">Alert settings</legend>
+
+    <!-- 2. Who are you? -->
+    <section class="al-card" aria-labelledby="al-who-title">
+      <h2 class="al-card-title" id="al-who-title">Who are you?</h2>
+      <label class="visually-hidden" for="al-player">Your name</label>
+      <select id="al-player">
+        <option value="">Pick your name</option>
+      </select>
+      <!-- Team pill + any "no team yet" note, filled in by alerts.js. -->
+      <div class="al-team" id="al-team"></div>
+    </section>
+
+    <!-- 3. Master switch. A checkbox with role="switch" is the standard
+         accessible way to build an on/off toggle: screen readers announce
+         it as "switch, on/off". The whole row is the <label>, so tapping
+         anywhere on it flips the switch. -->
+    <section class="al-card">
+      <label class="al-switch-row" for="al-enabled">
+        <span class="al-switch-text">
+          <span class="al-switch-label">Notify me about scores</span>
+          <span class="al-switch-hint" id="al-enabled-hint"></span>
+        </span>
+        <input type="checkbox" role="switch" id="al-enabled" class="al-switch" aria-describedby="al-enabled-hint" />
+      </label>
+      <!-- "Saved" / error messages. aria-live="polite" makes screen
+           readers announce changes without interrupting. -->
+      <p class="al-status status-msg" id="al-status" aria-live="polite"></p>
+    </section>
+
+    <!-- 4. Level. Each option: radio + label, an ⓘ button, and a short
+         explanation that the ⓘ shows and hides. -->
+    <fieldset class="al-card al-group" id="al-level">
+      <legend class="al-card-title">What to send</legend>
+
+      <div class="al-option">
+        <label class="al-option-label"><input type="radio" name="level" value="hole" /> Every hole</label>
+        <button type="button" class="al-info" aria-expanded="false" aria-controls="al-info-hole" aria-label="About Every hole">ⓘ</button>
+        <p class="al-info-text" id="al-info-hole" hidden>A push each time a hole is decided in any match, plus segment and final results. Can be a lot, especially during singles.</p>
+      </div>
+
+      <div class="al-option">
+        <label class="al-option-label"><input type="radio" name="level" value="segment" checked /> Segment results</label>
+        <button type="button" class="al-info" aria-expanded="false" aria-controls="al-info-segment" aria-label="About Segment results">ⓘ</button>
+        <p class="al-info-text" id="al-info-segment" hidden>When a front 9, back 9 or overall result is locked in, plus match finals.</p>
+      </div>
+
+      <div class="al-option">
+        <label class="al-option-label"><input type="radio" name="level" value="final" /> Match finals</label>
+        <button type="button" class="al-info" aria-expanded="false" aria-controls="al-info-final" aria-label="About Match finals">ⓘ</button>
+        <p class="al-info-text" id="al-info-final" hidden>Only when a match finishes, with all three results.</p>
+      </div>
+    </fieldset>
+
+    <!-- 5. Scope. -->
+    <fieldset class="al-card al-group" id="al-scope">
+      <legend class="al-card-title">Whose scores</legend>
+
+      <div class="al-option">
+        <label class="al-option-label"><input type="radio" name="scope" value="mine" /> My team's scores</label>
+        <button type="button" class="al-info" aria-expanded="false" aria-controls="al-info-mine" aria-label="About My team's scores">ⓘ</button>
+        <!-- The team name inside is filled in by alerts.js. -->
+        <p class="al-info-text" id="al-info-mine" hidden>Only when <span id="al-my-team-name">your team</span> wins a hole, segment or match.</p>
+      </div>
+
+      <div class="al-option">
+        <label class="al-option-label"><input type="radio" name="scope" value="opposing" /> Opposing team's scores</label>
+        <button type="button" class="al-info" aria-expanded="false" aria-controls="al-info-opposing" aria-label="About Opposing team's scores">ⓘ</button>
+        <p class="al-info-text" id="al-info-opposing" hidden>Only when the other team does.</p>
+      </div>
+
+      <div class="al-option">
+        <label class="al-option-label"><input type="radio" name="scope" value="all" checked /> All scores</label>
+        <button type="button" class="al-info" aria-expanded="false" aria-controls="al-info-all" aria-label="About All scores">ⓘ</button>
+        <p class="al-info-text" id="al-info-all" hidden>Everything, including halved holes and segments.</p>
+      </div>
+    </fieldset>
+  </fieldset>
+
+  <p class="st-note">Settings are saved for this phone only. On another phone, set them up there too.</p>
+
+  <script type="module" src="js/nav.js?v=4"></script>
+  <script type="module" src="js/alerts.js"></script>
+</body>
+</html>

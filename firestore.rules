@@ -119,5 +119,37 @@ service cloud.firestore {
               && (myPlayerId() in resource.data.sideA || myPlayerId() in resource.data.sideB));
       }
     }
+
+    // Push-notification settings, one document per browser (see
+    // js/alerts.js). The document's name is the browser's anonymous
+    // uid, so "your own document" simply means docId == your uid. A
+    // browser can read, create, change and delete ONLY its own. Nobody
+    // can list or read anyone else's (tokens are private: a token is
+    // what lets someone push to that phone). The server-side function
+    // (stage 2) reads them with admin access, which bypasses these
+    // rules entirely.
+    match /pushSubscriptions/{uid} {
+      function isOwner() {
+        return request.auth != null && request.auth.uid == uid;
+      }
+
+      // The shape every write must have: exactly these six keys, each
+      // of the right type, level/scope from the allowed lists, and
+      // updatedAt set to the server's clock (serverTimestamp() in the
+      // app arrives here as request.time), so it can't be faked.
+      function validSubscription(d) {
+        return d.keys().hasOnly(['enabled', 'token', 'playerId', 'level', 'scope', 'updatedAt'])
+          && d.keys().hasAll(['enabled', 'token', 'playerId', 'level', 'scope', 'updatedAt'])
+          && d.enabled is bool
+          && d.token is string && d.token.size() < 4096
+          && d.playerId is string
+          && d.level in ['hole', 'segment', 'final']
+          && d.scope in ['mine', 'opposing', 'all']
+          && d.updatedAt == request.time;
+      }
+
+      allow read, delete: if isOwner();
+      allow create, update: if isOwner() && validSubscription(request.resource.data);
+    }
   }
 }
