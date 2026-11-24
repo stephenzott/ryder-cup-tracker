@@ -49,7 +49,8 @@
         "firebase-debug.*.log",
         "*.local",
         "test",
-        "scripts"
+        "scripts",
+        ".rehearsal-pushes.jsonl"
       ]
     }
   ],

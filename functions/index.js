@@ -21,6 +21,7 @@
 //   - Under the emulators, a mock sender is ALWAYS used: real FCM is
 //     unreachable from local testing.
 
+import { appendFileSync } from "node:fs";
 import { setGlobalOptions, logger } from "firebase-functions/v2";
 import { onDocumentUpdated } from "firebase-functions/v2/firestore";
 import { onCall, HttpsError } from "firebase-functions/v2/https";
@@ -86,6 +87,11 @@ async function fcmSend(messages) {
 // title, never the token) and reports success. Real FCM is never called.
 // For testing the dead-token cleanup locally, a token starting with
 // "dead-" is answered the way FCM answers an uninstalled phone.
+//
+// For the rehearsal (test/rehearsal.mjs), if the MOCK_PUSH_LOG environment
+// variable names a file, each pretend push is also appended to it as one
+// line of JSON, so the rehearsal can print what every phone "received".
+// That's a file on this computer, not a database write.
 async function mockSend(messages, labels) {
   return messages.map((m, i) => {
     if (m.token.startsWith("dead-")) {
@@ -93,6 +99,9 @@ async function mockSend(messages, labels) {
       return { success: false, error: { code: "messaging/registration-token-not-registered" } };
     }
     logger.info(`[mock push] to ${labels[i]}: "${m.data.title}" | ${m.data.body.replace(/\n/g, " / ")} | tag=${m.data.tag} url=${m.data.url}`);
+    if (process.env.MOCK_PUSH_LOG) {
+      appendFileSync(process.env.MOCK_PUSH_LOG, JSON.stringify({ to: labels[i], ...m.data }) + "\n");
+    }
     return { success: true };
   });
 }

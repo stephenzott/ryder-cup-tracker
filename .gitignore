@@ -23,3 +23,6 @@ node_modules/
 functions/scoring.js
 functions/rounds-config.js
 functions/trip-year.js
+
+# Scratch output of `npm run rehearse`
+functions/.rehearsal-pushes.jsonl
