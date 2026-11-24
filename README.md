@@ -142,7 +142,7 @@ confirm.
 
 | Platform | Push alerts | Offline play |
 |---|---|---|
-| iPhone, Home Screen app (iOS 16.4+) | ✅ test push received | ☐ not yet tried on a real phone |
+| iPhone, Home Screen app (iOS 16.4+) | ✅ test push received (rechecked after the offline deploy, 2026-11-24) | ✅ "Ready for offline" and opens in airplane mode (2026-11-24). ☐ holes saved offline surviving a force-quit (`OFFLINE_REVIEW.md` §2) |
 | Android **Chrome** | ☐ only Firefox confirmed so far | ☐ |
 | Android **Samsung Internet** | ☐ | ☐ |
 | Android **Firefox** | ✅ test push received | ☐ |
