@@ -9,7 +9,7 @@ show markdown asterisks literally.
 
 https://the-cup-tracker.web.app/alerts.html
 
-Open it in Safari on iPhone or Chrome on Android. Not inside Instagram, Facebook or another app: if you tapped it there, open it in your browser instead.
+Open it in Safari on iPhone or Chrome (or Firefox) on Android. Not inside Instagram, Facebook or another app: if you tapped it there, open it in your browser instead.
 
 📱 iPhone (iOS 16.4 or newer)
 1. Open the link in Safari
@@ -26,6 +26,8 @@ Open it in Safari on iPhone or Chrome on Android. Not inside Instagram, Facebook
 3. Pick your name
 4. Turn on Notify me about scores and tap Allow
 5. Tap Send me a test notification: you should get one within a few seconds
+
+🦊 Firefox on Android? Same steps, just open the link in Firefox. In step 2, the ⋮ menu says Install (or Add to Home screen).
 
 Choose what you hear about under What to send (every hole, segment results or just match finals) and Whose scores (your team, the other team or everything). Every hole gets busy on singles day!
 
