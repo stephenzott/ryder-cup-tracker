@@ -14,12 +14,15 @@ import { db } from "./firebase-init.js";
 import {
   collection,
   onSnapshot,
+  getDocsFromCache,
 } from "https://www.gstatic.com/firebasejs/11.3.1/firebase-firestore.js";
+// Which player this phone picked on "Who are you?" (for "Your match").
+import { getUnlockPlayerId } from "./auth.js";
 import { ROUNDS, pointsAvailable, TOTAL_POINTS_AVAILABLE } from "./rounds-config.js";
 import { sumMatchPoints, scoreMatch } from "./scoring.js";
 import { flash } from "./flash.js";
 // formatPoints shows halves as "½" (e.g. 12½); shared with the scoreboard and round pages.
-import { formatPoints, CURRENT_YEAR } from "./match-ui.js";
+import { formatPoints, CURRENT_YEAR, statusPill } from "./match-ui.js";
 import { TRIP } from "./schedule-config.js";
 
 // Width of a tug-of-war fill, as a CSS percentage: this side's points
@@ -35,9 +38,9 @@ function barPercent(points, available) {
 // ------------------------------------------------------------------
 const POINTS_TO_WIN = TOTAL_POINTS_AVAILABLE / 2 + 0.5;
 
-// Total matches across the trip, summed from the config rather than
-// typed in, so it stays right if a round's matchCount ever changes.
-const TOTAL_MATCHES = ROUNDS.reduce((sum, round) => sum + round.matchCount, 0);
+// A tie: exactly half of everything (30 of 60).
+const POINTS_TO_TIE = TOTAL_POINTS_AVAILABLE / 2;
+document.getElementById("points-to-tie").textContent = formatPoints(POINTS_TO_TIE);
 
 // Header year and location from config (see schedule-config.js), so
 // next year's trip only needs the config files updated.
@@ -76,8 +79,18 @@ infoButton.addEventListener("click", () => {
 // have all 18 holes in (new for the "Matches complete" chip).
 const roundTotals = {};
 for (const round of ROUNDS) {
-  roundTotals[round.id] = { a: 0, b: 0, projectedA: 0, projectedB: 0, completed: 0 };
+  roundTotals[round.id] = { a: 0, b: 0, projectedA: 0, projectedB: 0 };
 }
+
+// Each round's match documents, kept for the "Your match" card
+// (Prompt 5). roundId -> [{ id, ...data }]
+const matchDocsByRound = {};
+
+// Rounds whose first snapshot has arrived. A round's FIRST snapshot is
+// just the page loading (no highlight); every later one is a real
+// change from someone's phone (highlight). (Declared up here because
+// render(), which runs straight away, also reads it.)
+const loadedRounds = new Set();
 
 // ------------------------------------------------------------------
 // One "How we got here" card. Used for each round and for the Total
@@ -123,15 +136,13 @@ function render({ highlight = false } = {}) {
   let totalB = 0;
   let projTotalA = 0;
   let projTotalB = 0;
-  let completedMatches = 0;
 
   const cardsHtml = ROUNDS.map((round) => {
-    const { a, b, projectedA, projectedB, completed } = roundTotals[round.id];
+    const { a, b, projectedA, projectedB } = roundTotals[round.id];
     totalA += a;
     totalB += b;
     projTotalA += projectedA;
     projTotalB += projectedB;
-    completedMatches += completed;
     return roundCardHtml({
       title: `${round.day} · ${round.format}`,
       subtitle: round.course,
@@ -166,10 +177,15 @@ function render({ highlight = false } = {}) {
   document.getElementById("tug-usa").style.width = barPercent(totalA, TOTAL_POINTS_AVAILABLE);
   document.getElementById("tug-eu").style.width = barPercent(totalB, TOTAL_POINTS_AVAILABLE);
 
-  // Projected row and matches-complete chip.
+  // Projected row and the points chip. "Still in play" = everything not
+  // yet awarded: all points minus what both teams have actually won
+  // (finished nines and matches, halves counted as ½ each).
   document.getElementById("projected-a").textContent = formatPoints(projTotalA);
   document.getElementById("projected-b").textContent = formatPoints(projTotalB);
-  document.getElementById("matches-complete").textContent = `${completedMatches} of ${TOTAL_MATCHES}`;
+  document.getElementById("points-in-play").textContent =
+    `${formatPoints(TOTAL_POINTS_AVAILABLE - totalA - totalB)} of ${formatPoints(TOTAL_POINTS_AVAILABLE)}`;
+
+  renderMyMatch();
 
   // Compare with the previous render and flash whatever changed.
   const now = {
@@ -198,26 +214,87 @@ function render({ highlight = false } = {}) {
   shown = now;
 }
 
+// ------------------------------------------------------------------
+// "Your match" shortcut card (Prompt 5).
+// Once this phone has picked a name on "Who are you?", Home shows a
+// one-tap link to that player's CURRENT match: the first round, in trip
+// order, where they're paired and the match isn't finished yet. That
+// needs no dates: it moves from Friday AM to Friday PM by itself the
+// moment the morning match is complete. Hidden when no name is picked,
+// the player isn't paired, or all their matches are done.
+// ------------------------------------------------------------------
+
+// Player names, read from the phone's own copy of the database only
+// (getDocsFromCache: no server read, no cost). The hourly warm-up in
+// offline-ready.js keeps that copy filled. If it's empty, the card
+// simply leaves the opponents' names out.
+let namesById = {};
+async function loadNamesFromCache() {
+  try {
+    const snap = await getDocsFromCache(collection(db, "players"));
+    namesById = Object.fromEntries(snap.docs.map((d) => [d.id, d.data().name]));
+  } catch {
+    // Nothing cached yet: fine, try again on the next update.
+  }
+}
+
+// "Ben Brown" -> "Brown"
+function lastName(full) {
+  const parts = String(full || "").trim().split(/\s+/);
+  return parts[parts.length - 1] || "";
+}
+
+function renderMyMatch() {
+  const el = document.getElementById("my-match");
+  const playerId = getUnlockPlayerId();
+  // Wait until every round has loaded, so an earlier round's match
+  // can't be skipped just because its data arrived later.
+  if (!playerId || loadedRounds.size < ROUNDS.length) {
+    el.hidden = true;
+    return;
+  }
+  for (const round of ROUNDS) {
+    const match = (matchDocsByRound[round.id] || []).find(
+      (m) => (m.sideA || []).includes(playerId) || (m.sideB || []).includes(playerId)
+    );
+    if (!match) continue;
+    const scored = scoreMatch(match);
+    if (scored.overall.complete) continue;   // finished: look at the next round
+
+    const opponents = (match.sideA || []).includes(playerId) ? match.sideB || [] : match.sideA || [];
+    const names = opponents.map((id) => lastName(namesById[id])).filter(Boolean).join("/");
+    const label = `${round.day} · ${match.id.replace("match", "Match ")}${names ? ` · vs ${names}` : ""}`;
+    el.href = `${round.id}.html`;
+    el.innerHTML = `
+      <span class="hm-mymatch-text">
+        <span class="hm-mymatch-label">Your match</span>
+        <span class="hm-mymatch-title"></span>
+      </span>
+      ${statusPill(scored.overall)}
+      <span class="hm-mymatch-arrow" aria-hidden="true">→</span>
+    `;
+    // Names go in with textContent, so they can never be read as HTML.
+    el.querySelector(".hm-mymatch-title").textContent = label;
+    el.hidden = false;
+    return;
+  }
+  el.hidden = true;
+}
+
 render();
 
-// Rounds whose first snapshot has arrived. A round's FIRST snapshot is
-// just the page loading (no highlight); every later one is a real
-// change from someone's phone (highlight).
-const loadedRounds = new Set();
 
 for (const round of ROUNDS) {
   onSnapshot(collection(db, "rounds", round.id, "matches"), (snapshot) => {
     const isUpdate = loadedRounds.has(round.id);
     loadedRounds.add(round.id);
     const matches = snapshot.docs.map((docSnap) => docSnap.data());
-    roundTotals[round.id] = {
-      // Same totals as before (a, b, projectedA, projectedB)...
-      ...sumMatchPoints(matches),
-      // ...plus how many matches have all 18 holes in. scoreMatch is
-      // the same function sumMatchPoints uses internally; we only read
-      // its overall.complete flag here.
-      completed: matches.filter((match) => scoreMatch(match).overall.complete).length,
-    };
+    // Same totals as before (a, b, projectedA, projectedB).
+    roundTotals[round.id] = sumMatchPoints(matches);
+    matchDocsByRound[round.id] = snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }));
+    // Names for the "Your match" card come from the phone's copy; fetch
+    // them once the first time (and again later if it was still empty).
+    if (Object.keys(namesById).length === 0) loadNamesFromCache().then(() => renderMyMatch());
     render({ highlight: isUpdate });
   });
 }

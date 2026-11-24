@@ -17,7 +17,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Inter:wght@400;500;600&display=swap" />
   <title>2027 Ryder Cup Trip — Live Standings</title>
-  <link rel="stylesheet" href="css/style.css?v=18" />
+  <link rel="stylesheet" href="css/style.css?v=19" />
 </head>
 <body>
   <!-- Every number below starts at a sensible default (0, "30½", "0 of
@@ -62,6 +62,11 @@
     </div>
   </section>
 
+  <!-- 2b. "Your match" shortcut (Prompt 5). Filled in and shown by
+       index.js only when this phone has picked a name and that player
+       has an unfinished match; otherwise it stays hidden. -->
+  <a class="hm-mymatch" id="my-match" hidden></a>
+
   <!-- 3. Projected row, with an ⓘ button that shows/hides the note. -->
   <div class="projected-row">
     <span class="projected-label">Projected</span>
@@ -78,9 +83,10 @@
     Counts in-progress segments (front 9 / back 9 / overall) as if they ended right now — not official until a segment is actually complete.
   </p>
 
-  <!-- 4. Matches-complete chip. -->
+  <!-- 4. Points chip (Prompt 5: was "Matches complete", which sat
+       next to point totals and mixed matches with points). -->
   <div class="chip-row">
-    <span class="chip">Matches complete: <strong id="matches-complete">0 of 20</strong></span>
+    <span class="chip"><strong id="points-in-play">60 of 60</strong> pts still in play · <span class="to-win">30½</span> wins, <span id="points-to-tie">30</span> ties</span>
   </div>
 
   <!-- 5. One card per round, plus a Total card. Built by index.js,

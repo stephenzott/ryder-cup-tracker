@@ -262,7 +262,41 @@ function stepperHtml(matchId, side, playerIndex, value, par, who, holeNum) {
              value="${value}" placeholder="${par}" aria-label="${who}, hole ${holeNum} strokes" />
       <button type="button" class="rd-step" ${target} data-step="1" aria-label="One more for ${who}">+</button>
     </div>
+    ${quickPickHtml(target, value, par, who)}
   `;
+}
+
+// Quick-pick buttons (Prompt 5): one tap puts a common score in the box
+// above: birdie, par, bogey or double bogey for this hole's par, in a
+// 2 x 2 grid (each button is big enough for a gloved thumb). Like the
+// − / + buttons they only fill in the box; nothing is saved until Save.
+// aria-pressed marks the one matching the box's current number, which
+// is also highlighted (see syncQuickPicks).
+const QUICK_WORDS = ["birdie", "par", "bogey", "double"];
+function quickPickHtml(target, value, par, who) {
+  const buttons = [par - 1, par, par + 1, par + 2]
+    .map((n, i) => ({ n, word: QUICK_WORDS[i] }))
+    .filter(({ n }) => n >= 1 && n <= 15)
+    .map(
+      ({ n, word }) => `
+        <button type="button" class="rd-quick-btn" ${target} data-value="${n}"
+                aria-pressed="${String(value) === String(n)}" aria-label="${who}: ${n}, ${word}">
+          <span class="rd-quick-num">${n}</span><span class="rd-quick-word" aria-hidden="true">${word}</span>
+        </button>`
+    )
+    .join("");
+  return `<div class="rd-quick" role="group" aria-label="Quick pick for ${who}">${buttons}</div>`;
+}
+
+// After any box changes, re-mark which quick-pick button matches it.
+function syncQuickPicks(card) {
+  card.querySelectorAll(".rd-quick-btn").forEach((button) => {
+    const index = button.dataset.playerIndex;
+    const input = card.querySelector(
+      `.hole-score-input[data-side="${button.dataset.side}"]${index == null ? "" : `[data-player-index="${index}"]`}`
+    );
+    button.setAttribute("aria-pressed", String(input && input.value === button.dataset.value));
+  });
 }
 
 // The score inputs for the current hole (editable cards). Rounds 1/2/4
@@ -453,6 +487,9 @@ function renderMatchCard(matchId, mine) {
   const entry = canEdit
     ? `
       ${renderHoleInputs(matchId, data, currentHole, sideA, sideB)}
+      <!-- Prompt 5: fills every box with this hole's par in one tap
+           (then Save, as usual). -->
+      <button type="button" class="secondary rd-both-par" data-match-id="${matchId}">${isBestBall ? "All par" : "Both par"} (${holeInfo.par})</button>
       <div class="rd-save-row">
         <button type="button" class="save-hole rd-save" data-match-id="${matchId}">Save hole ${currentHole}</button>
         <span class="rd-unsaved"${hasDraft ? "" : " hidden"}>Not saved yet</span>
@@ -531,14 +568,14 @@ function renderRoundTotal() {
 // (which kind of control, for which match/side/player/hole), so that
 // after a redraw the same control can be found and focused again.
 // Keeps keyboard and screen-reader users in place.
-const FOCUS_CLASSES = ["hole-score-input", "rd-step", "prev-hole", "next-hole", "rd-hole-btn", "save-hole"];
+const FOCUS_CLASSES = ["hole-score-input", "rd-step", "rd-quick-btn", "rd-both-par", "prev-hole", "next-hole", "rd-hole-btn", "save-hole"];
 function focusSelector(el) {
   if (!el || !el.closest || !el.closest("#matches")) return null;
   const cls = FOCUS_CLASSES.find((c) => el.classList.contains(c));
   if (!cls) return null;
   const card = el.closest(".rd-card");
   let selector = `[data-match-id="${card.dataset.matchId}"] .${cls}`;
-  for (const attr of ["side", "playerIndex", "step", "hole"]) {
+  for (const attr of ["side", "playerIndex", "step", "hole", "value"]) {
     if (el.dataset[attr] != null) {
       const name = attr.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`);   // playerIndex -> player-index
       selector += `[data-${name}="${el.dataset[attr]}"]`;
@@ -584,6 +621,7 @@ function updateDraft(card) {
   };
   const note = card.querySelector(".rd-unsaved");
   if (note) note.hidden = false;
+  syncQuickPicks(card);
 }
 
 // ---------------------------------------------------------------
@@ -613,6 +651,27 @@ matchesEl.addEventListener("click", async (event) => {
   if (target.classList.contains("prev-hole")) return goToHole(matchId, currentHoleByMatch[matchId] - 1);
   if (target.classList.contains("next-hole")) return goToHole(matchId, currentHoleByMatch[matchId] + 1);
   if (target.classList.contains("rd-hole-btn")) return goToHole(matchId, parseInt(target.dataset.hole, 10));
+
+  // Quick pick: put that number in the matching box.
+  if (target.classList.contains("rd-quick-btn")) {
+    const index = target.dataset.playerIndex;
+    const input = card.querySelector(
+      `.hole-score-input[data-side="${target.dataset.side}"]${index == null ? "" : `[data-player-index="${index}"]`}`
+    );
+    input.value = target.dataset.value;
+    updateDraft(card);
+    return;
+  }
+
+  // Both par / All par: every box on this card gets the hole's par.
+  if (target.classList.contains("rd-both-par")) {
+    const par = course.holes[currentHoleByMatch[matchId] - 1].par;
+    card.querySelectorAll(".hole-score-input").forEach((input) => {
+      input.value = par;
+    });
+    updateDraft(card);
+    return;
+  }
 
   // − / + : change the matching box by one. An empty box starts at par
   // on the first tap. Kept between 1 and 15 (the box's min/max).

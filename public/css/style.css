@@ -3850,3 +3850,118 @@ body.has-offline-banner {
   font-size: 0.85rem;
   color: var(--muted);
 }
+
+/* ==================================================================
+   15. DAY-OF POLISH  (Prompt 5). New classes only.
+   ================================================================== */
+
+/* --- Round pages: quick-pick numbers under each score box ---
+   A 2 x 2 grid (birdie, par / bogey, double), each button at least
+   44px tall, filling the column's width, so a gloved thumb hits it.
+   The pressed one (matching the box) is filled navy. */
+.rd-quick {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.rd-quick-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 2px 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-small);
+  background: var(--card);
+  color: var(--navy);
+  line-height: 1.05;
+}
+
+.rd-quick-btn:hover {
+  background: var(--bg);
+  border-color: var(--halved);
+}
+
+.rd-quick-num {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.2rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.rd-quick-word {
+  font-size: 0.68rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.rd-quick-btn[aria-pressed="true"] {
+  background: var(--navy);
+  border-color: var(--navy);
+  color: var(--on-navy);
+}
+
+.rd-quick-btn[aria-pressed="true"] .rd-quick-word {
+  color: var(--on-navy-muted);
+}
+
+/* "Both par (4)": full width, just above Save. */
+.rd-both-par {
+  width: 100%;
+  min-height: 44px;
+  margin-top: var(--space-3);
+}
+
+/* --- Home: "Your match" shortcut card (js/index.js) ---
+   A white card with a navy left edge: label, which match, its status
+   pill, and an arrow. The whole card is one link to the round page. */
+.hm-mymatch {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 56px;
+  margin-top: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  background: var(--card);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card), inset 4px 0 0 var(--navy);
+  color: var(--text);
+  text-decoration: none;
+}
+
+.hm-mymatch[hidden] {
+  display: none;
+}
+
+.hm-mymatch-text {
+  flex: 1 1 auto;
+  min-width: 0;   /* lets long names wrap instead of widening the page */
+}
+
+.hm-mymatch-label {
+  display: block;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.8rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.hm-mymatch-title {
+  display: block;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.1rem;
+  color: var(--navy);
+}
+
+.hm-mymatch-arrow {
+  flex: none;
+  font-size: 1.3rem;
+  color: var(--navy);
+}
