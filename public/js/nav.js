@@ -224,3 +224,16 @@ function initNav() {
 
 // Module scripts run after the HTML is parsed, so <body> exists here.
 initNav();
+
+// ------------------------------------------------------------------
+// Offline project, stage 1: the "No signal" banner (js/connection.js).
+// nav.js runs on every page, so loading it from here puts the banner
+// everywhere without touching each page's own script.
+//
+// import(...) as a function call (a "dynamic import") loads the file
+// in the background AFTER the tab bar is built. If it ever fails to
+// load (say Firebase's servers can't be reached), the failure stays
+// here and the tab bar still works, which an ordinary `import` line at
+// the top of this file would not guarantee.
+// ------------------------------------------------------------------
+import("./connection.js").catch((err) => console.warn("nav.js: offline banner unavailable", err));

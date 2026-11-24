@@ -60,7 +60,16 @@ export function ensureSignedIn() {
           unsubscribe();
           resolve(user);
         } else {
-          signInAnonymously(auth).catch(reject);
+          // Offline project: if sign-in fails (typically no signal on a
+          // phone that has never signed in before), stop listening and
+          // forget this failed attempt, so the NEXT call to
+          // ensureSignedIn() tries again instead of returning the same
+          // failure for the rest of the page's life.
+          signInAnonymously(auth).catch((err) => {
+            unsubscribe();
+            signInPromise = null;
+            reject(err);
+          });
         }
       }, reject);
     });

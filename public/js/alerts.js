@@ -24,11 +24,11 @@
 // FCM delivers it to that browser. No token = no way to reach the phone,
 // which is why switching alerts off deletes it.
 
-import { db, auth } from "./firebase-init.js";
+// IS_LOCAL: true when this page is opened from this computer (emulators).
+import { db, IS_LOCAL } from "./firebase-init.js";
 import { ensureSignedIn, getUnlockPlayerId } from "./auth.js";
 import {
   collection,
-  connectFirestoreEmulator,
   doc,
   getDoc,
   getDocs,
@@ -37,7 +37,6 @@ import {
   serverTimestamp,
   setDoc,
 } from "https://www.gstatic.com/firebasejs/11.3.1/firebase-firestore.js";
-import { connectAuthEmulator } from "https://www.gstatic.com/firebasejs/11.3.1/firebase-auth.js";
 // Cloud Functions client, for the "Send me a test notification" button.
 import {
   connectFunctionsEmulator,
@@ -81,17 +80,14 @@ const VAPID_PUBLIC_KEY = "BBwg72f4Vh80d1L16gt5BfbSdZtzb8pFHiyLX95GjKr_-grgTwWXpi
 const VAPID_KEY_IS_SET = !VAPID_PUBLIC_KEY.startsWith("PASTE_");
 
 // ------------------------------------------------------------------
-// Local testing only: when the page is opened from this computer
-// (the Firebase emulator at 127.0.0.1 / localhost), point Firestore
-// and Auth at the local emulators so testing NEVER writes to the live
-// database. On the real site the hostname is different, so these two
-// lines never run there. They have to run before any read or write,
-// which is why they sit at the top, before anything else touches
-// Firestore. (FCM has no emulator; getting a token always talks to
-// Google's real service, but that only registers this browser. It
-// sends nothing.)
+// Local testing only. Pointing Firestore and Auth at the local
+// emulators now happens in firebase-init.js, for EVERY page (offline
+// project, stage 1); connecting them a second time here would throw an
+// error, so only the Functions emulator is connected below. On the real
+// site IS_LOCAL is false and none of this runs. (FCM has no emulator;
+// getting a token always talks to Google's real service, but that only
+// registers this browser. It sends nothing.)
 // ------------------------------------------------------------------
-const IS_LOCAL = ["localhost", "127.0.0.1"].includes(location.hostname);
 
 // The Cloud Functions handle. The region must match where the functions
 // are deployed (functions/index.js: us-central1). db.app is the same
@@ -99,8 +95,6 @@ const IS_LOCAL = ["localhost", "127.0.0.1"].includes(location.hostname);
 const functions = getFunctions(db.app, "us-central1");
 
 if (IS_LOCAL) {
-  connectFirestoreEmulator(db, "127.0.0.1", 8080);
-  connectAuthEmulator(auth, "http://127.0.0.1:9099", { disableWarnings: true });
   // Locally, the test button calls the functions emulator, whose mock
   // sender only logs (it can never reach real FCM).
   connectFunctionsEmulator(functions, "127.0.0.1", 5001);

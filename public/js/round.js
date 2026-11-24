@@ -12,9 +12,17 @@
 //   4. If you've unlocked as a player, your own match goes first and a
 //      slim "Your match" bar stays pinned at the top.
 //
-// The only Firestore write here is one hole's scores (unchanged since
-// before the restyle). Everything else is drawing or local UI state
-// (which hole is open, unsaved drafts), which is never written anywhere.
+// The only Firestore write here is one hole's scores. Everything else is
+// drawing or local UI state (which hole is open, unsaved drafts), which
+// is never written to Firestore.
+//
+// Offline project, stage 1: Save no longer waits for the server. The
+// score goes into Firestore's on-phone queue (kept even if the app is
+// closed, see firebase-init.js) and the page moves straight on. Each
+// card then shows which holes are still waiting to send, flips them to
+// "Sent" when the server confirms, and warns if the server ends up
+// with a different number for a hole this phone entered (see
+// my-entries.js for how that's tracked).
 //
 // Sides are 'a' = USA and 'b' = EU, as in the Firestore data.
 
@@ -31,6 +39,18 @@ import { COURSES } from "./courses-config.js";
 import { HOLE_TIPS } from "./hole-tips-config.js";
 import { scoreMatch, sumMatchPoints, holeWinner } from "./scoring.js";
 import { playerLink } from "./player-stats.js";
+// Offline project: is the server reachable right now? (Also shows the
+// "No signal" banner; see connection.js.)
+import { isConnected, onConnectionChange, checkConnectionNow } from "./connection.js";
+// Offline project: this phone's notes of which holes it entered.
+import {
+  recordEntry,
+  entriesForMatch,
+  reconcileMatch,
+  markRefused,
+  warningsForMatch,
+  dismissWarning,
+} from "./my-entries.js";
 // Shared match-drawing pieces (also used by the scoreboard).
 import {
   formatPoints,
@@ -106,6 +126,25 @@ let players = [];
 let matchesById = {};
 let playersLoaded = false;
 let matchesLoaded = false;
+
+// For each match: does the phone hold changes to it that the server
+// hasn't confirmed yet? (Firestore's metadata.hasPendingWrites, which
+// is per match document, not per hole.) Filled in by the matches
+// listener at the bottom of this file.
+const pendingByMatch = {};
+
+// Matches whose waiting holes have just been confirmed by the server,
+// mapped to the time until which to show "✓ Sent" on the card. Purely
+// local, a few seconds of reassurance after signal returns.
+const justSentUntil = {};
+const SENT_FLASH_MS = 4000;
+
+// For this long after a save, a connected phone says "Sending…"; after
+// that, a save that still hasn't gone through is described as "saved on
+// this phone · will send when you have signal" (on weak signal the
+// connection can look fine while nothing actually gets through).
+const SENDING_GRACE_MS = 10000;
+let regraceTimer = null;
 
 // Which hole's entry panel each match is currently showing (1-18).
 // Purely local UI state -- never written to Firestore -- so it
@@ -292,6 +331,90 @@ function currentHoleFor(matchId, data) {
 }
 
 // ---------------------------------------------------------------
+// Sync status (offline project, stage 1)
+// ---------------------------------------------------------------
+
+// "5", or "4/5" for best ball (one number per player), or "–" if empty.
+function formatSide(value) {
+  if (Array.isArray(value)) return value.map((v) => (v == null ? "–" : v)).join("/");
+  return value == null ? "–" : String(value);
+}
+
+function formatHoleScore({ a, b }) {
+  return `USA ${formatSide(a)} – EU ${formatSide(b)}`;
+}
+
+// "Hole 5" or "Holes 5, 6, 7".
+function holesPhrase(holes) {
+  return holes.length === 1 ? `Hole ${holes[0]}` : `Holes ${holes.join(", ")}`;
+}
+
+// The amber notes for holes this phone entered that the server now shows
+// differently, or that the server refused. Each stays (even after the
+// app is reopened) until its OK button is tapped.
+function warningsHtml(matchId) {
+  return warningsForMatch(roundId, matchId)
+    .map((w) => {
+      let text;
+      if (w.type === "refused") {
+        text = `Hole ${w.hole} (${formatHoleScore(w.entered)}) didn't save: the server refused it${w.reason ? ` (${w.reason})` : ""}. Check you picked your own name, then enter it again.`;
+      } else if (w.now.a == null && w.now.b == null) {
+        text = `Hole ${w.hole} has no score on the server, but this phone entered ${formatHoleScore(w.entered)}. Please enter it again.`;
+      } else {
+        text = `Hole ${w.hole} was changed on another phone: now ${formatHoleScore(w.now)} (you entered ${formatHoleScore(w.entered)}).`;
+      }
+      return `
+        <div class="rd-sync-warning" role="alert">
+          <p>${text}</p>
+          <button type="button" class="secondary rd-sync-ok" data-warning-key="${w.key}">OK</button>
+        </div>
+      `;
+    })
+    .join("");
+}
+
+// The one-line sync status under the hole bar. Shown only while
+// something is waiting to send, then "✓ Sent" for a few seconds.
+function syncLineHtml(matchId) {
+  const pendingNotes = entriesForMatch(roundId, matchId).filter((note) => note.status === "pending");
+  const waiting = pendingNotes.map((note) => note.hole);
+
+  if (waiting.length > 0 || pendingByMatch[matchId]) {
+    // If Firestore says the match has unsent changes but this phone has
+    // no note of which holes (e.g. its notes were cleared), say so
+    // without naming holes.
+    const what = waiting.length > 0 ? holesPhrase(waiting) : "Scores";
+    // "Sending…" only while connected AND within a few seconds of the
+    // latest save; past that, the honest description is "on the phone".
+    const latestSave = Math.max(0, ...pendingNotes.map((note) => note.at || 0));
+    const sinceSave = Date.now() - latestSave;
+    const sending = isConnected() && sinceSave < SENDING_GRACE_MS;
+    // Redraw once when the grace ends, to re-word the line. (One shared
+    // timer, restarted each time, so frequent redraws don't pile up timers.)
+    if (sending) {
+      clearTimeout(regraceTimer);
+      regraceTimer = setTimeout(renderMatches, SENDING_GRACE_MS - sinceSave + 100);
+    }
+    const text = sending
+      ? `Sending ${what.toLowerCase()}…`
+      : `${what} saved on this phone · will send when you have signal`;
+    return `<p class="rd-sync-line is-pending" role="status">⏳ ${text}</p>`;
+  }
+  if ((justSentUntil[matchId] || 0) > Date.now()) {
+    return `<p class="rd-sync-line is-sent" role="status">✓ Sent</p>`;
+  }
+  return "";
+}
+
+// Small status beside Save for the hole on screen, if this phone
+// entered it: "Saved on phone" while waiting, "Sent ✓" once confirmed.
+function holeSyncStatus(matchId, hole) {
+  const note = entriesForMatch(roundId, matchId).find((n) => n.hole === hole);
+  if (!note) return { text: "", cls: "" };
+  return note.status === "pending" ? { text: "Saved on phone", cls: "" } : { text: "Sent ✓", cls: " ok" };
+}
+
+// ---------------------------------------------------------------
 // Match cards
 // ---------------------------------------------------------------
 
@@ -325,13 +448,15 @@ function renderMatchCard(matchId, mine) {
       ? `<p class="rd-locked-note">Only ${namesLinked(sideA) || "TBD"} or ${namesLinked(sideB) || "TBD"} can enter scores for this match.</p>`
       : "";
 
+  const holeSync = holeSyncStatus(matchId, currentHole);
+
   const entry = canEdit
     ? `
       ${renderHoleInputs(matchId, data, currentHole, sideA, sideB)}
       <div class="rd-save-row">
         <button type="button" class="save-hole rd-save" data-match-id="${matchId}">Save hole ${currentHole}</button>
         <span class="rd-unsaved"${hasDraft ? "" : " hidden"}>Not saved yet</span>
-        <span class="status-msg" data-save-status="${matchId}-hole"></span>
+        <span class="status-msg${holeSync.cls}" data-save-status="${matchId}-hole">${holeSync.text}</span>
       </div>
     `
     : renderHoleReadOnly(matchId, data, currentHole, sideA, sideB) + lockedNote;
@@ -355,6 +480,8 @@ function renderMatchCard(matchId, mine) {
           </div>
           <button type="button" class="rd-nav next-hole" data-match-id="${matchId}" aria-label="Next hole" ${currentHole >= 18 ? "disabled" : ""}>▶</button>
         </div>
+        ${warningsHtml(matchId)}
+        ${syncLineHtml(matchId)}
         <!-- Links out to Kohler's yardage PDF and hole-description page.
              rel="noopener" is standard practice for target="_blank"
              links: without it, the opened page gets a handle back to
@@ -477,6 +604,12 @@ matchesEl.addEventListener("click", async (event) => {
   if (!card) return;
   const matchId = card.dataset.matchId;
 
+  // OK on a "hole was changed / didn't save" warning: forget it.
+  if (target.classList.contains("rd-sync-ok")) {
+    dismissWarning(target.dataset.warningKey);
+    return renderMatches();
+  }
+
   if (target.classList.contains("prev-hole")) return goToHole(matchId, currentHoleByMatch[matchId] - 1);
   if (target.classList.contains("next-hole")) return goToHole(matchId, currentHoleByMatch[matchId] + 1);
   if (target.classList.contains("rd-hole-btn")) return goToHole(matchId, parseInt(target.dataset.hole, 10));
@@ -501,12 +634,52 @@ matchesEl.addEventListener("click", async (event) => {
     const aValue = readSideValue(card, "a");
     const bValue = readSideValue(card, "b");
 
-    await updateDoc(matchRef(matchId), {
-      [`holes.${hole}.a`]: aValue,
-      [`holes.${hole}.b`]: bValue,
+    // Only write a side that has at least one number in it. If both
+    // scorers are offline and one enters only their own side, writing
+    // the other side as blank would ERASE the number the other phone
+    // entered once both sync. The trade-off (chosen deliberately):
+    // emptying a box and saving no longer clears a number; type the
+    // right number instead. (Best ball: a side counts as entered if any
+    // of its players has a number.)
+    const hasNumber = (value) => (Array.isArray(value) ? value.some((v) => v != null) : value != null);
+    const update = {};
+    if (hasNumber(aValue)) update[`holes.${hole}.a`] = aValue;
+    if (hasNumber(bValue)) update[`holes.${hole}.b`] = bValue;
+    if (Object.keys(update).length === 0) return;   // nothing entered: nothing to save
+
+    // Note what this phone saved, so the card can show it as waiting
+    // and later confirm or flag it (see my-entries.js).
+    recordEntry(roundId, matchId, hole, aValue, bValue);
+
+    // Hand the write to Firestore WITHOUT waiting (no `await`). Firestore
+    // applies it to the phone's copy at once (so the page redraws with
+    // it) and queues it on the phone until the server can be reached;
+    // the promise it returns only settles when the SERVER answers, which
+    // with no signal could be an hour from now. So we move on right away
+    // and only listen for a refusal (.catch below). updateDoc can also
+    // throw immediately for badly formed data; the try/catch turns that
+    // into the same kind of refusal so both are handled in one place.
+    let write;
+    try {
+      write = updateDoc(matchRef(matchId), update);
+    } catch (err) {
+      write = Promise.reject(err);
+    }
+    write.catch((err) => {
+      // Only reachable while this page stays open. If the app was
+      // closed before the server refused the write, the refusal is
+      // noticed instead by reconcileMatch (the server shows a different
+      // number than this phone entered) and shown as a warning.
+      console.error(`Saving hole ${hole} of ${matchId} failed`, err);
+      const reason = err && err.code === "permission-denied" ? "not allowed" : err && err.code;
+      markRefused(roundId, matchId, hole, { a: aValue, b: bValue }, reason);
+      renderMatches();
     });
 
-    // Saved, so this hole's draft is no longer needed.
+    // Check the connection now, so a dead one shows up within seconds.
+    checkConnectionNow();
+
+    // Saved on the phone, so this hole's draft is no longer needed.
     delete drafts[draftKey(matchId, hole)];
 
     // Once both scores for this hole are in, move on to the next
@@ -545,14 +718,35 @@ onSnapshot(collection(db, "players"), (snapshot) => {
   render();
 });
 
-onSnapshot(collection(db, "rounds", roundId, "matches"), (snapshot) => {
+// includeMetadataChanges: true also calls us when only the sync status
+// changes (a waiting save is confirmed, or the connection drops), not
+// just when the scores themselves change. Without it the "waiting"
+// badges would never flip to "Sent".
+onSnapshot(collection(db, "rounds", roundId, "matches"), { includeMetadataChanges: true }, (snapshot) => {
   matchesById = {};
   snapshot.forEach((d) => {
     matchesById[d.id] = d.data();
+    pendingByMatch[d.id] = d.metadata.hasPendingWrites;
+
+    // When the server has confirmed this match's current state (nothing
+    // of ours still waiting, and not the phone's saved copy), compare
+    // it with what this phone entered: mark matching holes "sent", and
+    // turn any contradicted ones into warnings.
+    if (!d.metadata.hasPendingWrites && !d.metadata.fromCache) {
+      const newlySent = reconcileMatch(roundId, d.id, d.data().holes || {});
+      if (newlySent.length > 0) {
+        justSentUntil[d.id] = Date.now() + SENT_FLASH_MS;
+        setTimeout(renderMatches, SENT_FLASH_MS + 100);
+      }
+    }
   });
   matchesLoaded = true;
   render();
 });
+
+// Redraw when the connection comes or goes, so "will send when you
+// have signal" and "Sending…" swap without waiting for new data.
+onConnectionChange(() => renderMatches());
 
 renderUnlockBar(document.getElementById("unlock"), "score", () => {
   isScoreUnlocked = true;

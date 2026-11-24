@@ -3628,3 +3628,93 @@ input[type="checkbox"].al-switch:disabled {
 .al-test-btn {
   width: 100%;
 }
+
+/* ==================================================================
+   13. OFFLINE  (offline project, stage 1)
+   The "No signal" banner (js/connection.js, every page) and the round
+   pages' sync line and warnings (js/round.js). New classes only; no
+   existing rule above is changed.
+   ================================================================== */
+
+/* Two new colors for warnings. Amber, because red and blue already mean
+   USA and EU in this app. --warn on --warn-tint is about 7:1 contrast,
+   readable in sunlight. */
+:root {
+  --warn: #7A4B00;
+  --warn-tint: #FFF3D6;
+}
+
+/* --- "No signal" banner ---
+   A slim strip fixed just above the bottom tab bar, so it stays in view
+   wherever you scroll. Muted grey-navy rather than a loud color: being
+   offline on a golf course is normal, not an emergency. */
+.offline-banner {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: calc(var(--tabbar-height) + env(safe-area-inset-bottom));
+  z-index: 99;   /* under the tab bar (100) and its menus (101) */
+  padding: 6px max(var(--space-4), env(safe-area-inset-right)) 6px max(var(--space-4), env(safe-area-inset-left));
+  background: var(--muted);
+  color: var(--on-navy);
+  font-size: 0.8rem;
+  line-height: 1.3;
+  text-align: center;
+}
+
+/* The banner sets display above, which would otherwise beat the
+   `hidden` attribute the script uses to hide it. */
+.offline-banner[hidden] {
+  display: none;
+}
+
+/* While the banner shows, give the page extra room at the bottom (same
+   formula as the body's normal bottom padding, plus the banner's
+   height) so the last thing on the page never hides behind it. */
+body.has-offline-banner {
+  padding-bottom: calc(var(--tabbar-height) + env(safe-area-inset-bottom) + var(--space-6) + 40px);
+}
+
+/* --- Round pages: one-line sync status under the hole bar ---
+   "⏳ Holes 5, 6 saved on this phone · will send when you have signal",
+   then "✓ Sent" for a few seconds. */
+.rd-sync-line {
+  margin: var(--space-2) 0 0;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.rd-sync-line.is-pending {
+  color: var(--muted);
+}
+
+.rd-sync-line.is-sent {
+  color: var(--ok);
+}
+
+/* --- Round pages: "hole was changed / didn't save" warning ---
+   Amber box with the message and an OK button (44px+ tap target). */
+.rd-sync-warning {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-top: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  background: var(--warn-tint);
+  color: var(--warn);
+  border-left: 4px solid var(--warn);
+  border-radius: var(--radius-small);
+  font-size: 0.85rem;
+  line-height: 1.35;
+}
+
+.rd-sync-warning p {
+  flex: 1 1 auto;
+  margin: 0;
+}
+
+.rd-sync-ok {
+  flex: 0 0 auto;
+  min-width: 56px;
+  min-height: 44px;
+}
