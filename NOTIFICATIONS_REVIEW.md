@@ -160,7 +160,8 @@ Result: front 9 USA 1 UP; back 9 EU 3 UP; overall EU 2 UP; **EU wins 2–1**.
 These worked as intended:
 - Hole 5 went to EU on Ben's stroke.
 - The half-entered hole 8 sent nothing.
-- The correction sent nothing.
+- The correction sent nothing. *(Changed in the offline project,
+  Prompt 4: it now sends "Correction: EU wins hole 8"; see below.)*
 - Halved holes reached only the "All" subscribers.
 - The final carried all three results ("Front USA · Back EU · Overall EU 2 UP").
 
@@ -171,6 +172,11 @@ These worked as intended:
    (corrections send nothing). The next push carried the right standing,
    but "USA wins hole 8" stayed on lock screens until the hole 10 alert
    replaced it (hole 9's alert was the front-9 one, which has its own tag).
+   **Update (offline project, Prompt 4):** corrections that change a
+   result are now announced. Re-running the rehearsal, the fix sends
+   **"Correction: EU wins hole 8"** with the same tag, so it replaces the
+   wrong alert on lock screens. A stroke fix that keeps the same winner
+   is still silent.
 2. **Hole 9 and hole 18 weren't announced as holes.** When a hole also
    finishes a nine or the match, people get only the bigger alert.
 3. **"Every hole" is a lot.** 18 pushes per match. On singles day (8
@@ -320,8 +326,10 @@ artifact cleanup policy, and the public-invoker permission on
   couldn't be read). The conclusion (under $1) holds with a wide margin.
 
 **Known issues**
-- **Not fixable without new code:** corrections aren't announced, so a
-  mistyped hole's alert can be wrong (rehearsal surprise 1).
+- ~~**Not fixable without new code:** corrections aren't announced, so a
+  mistyped hole's alert can be wrong (rehearsal surprise 1).~~ Fixed in
+  the offline project, Prompt 4: a correction that changes a hole, nine
+  or match result now sends a "Correction: …" alert.
 - **Permission fix not in the deploy itself:** `invoker: "public"` is now
   in the code, but on this project the first deploy didn't apply it. If
   the function is ever deleted and recreated, the `gcloud` fix in

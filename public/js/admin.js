@@ -4,6 +4,11 @@
 //   Players       add a player, change this year's team, remove a player
 //   R1 ... R4     that round's match setup: who plays each match
 //                 (pairings) and, for rounds 3-4, handicap strokes given
+//   Log           the score-change log (Prompt 4): every change to a
+//                 hole's score, newest first, read-only. Entries are
+//                 written by the Cloud Function logScoreEdit; this page
+//                 only reads them (and the rules let only the admin
+//                 code read them at all)
 //
 // These tools used to live on the Roster page (players) and on each
 // round page (match setup). The Firestore writes are exactly the same
@@ -49,9 +54,9 @@ for (const round of ROUNDS) matchesByRound[round.id] = {};
 
 // Tabs: "players", then one per round. Remembered in the address
 // (#round4) so a link like admin.html#round4 opens that round.
-const TABS = [{ id: "players", day: "Players", sub: "Roster" }].concat(
-  ROUNDS.map((r, i) => ({ id: r.id, day: `R${i + 1}`, sub: r.format }))
-);
+const TABS = [{ id: "players", day: "Players", sub: "Roster" }]
+  .concat(ROUNDS.map((r, i) => ({ id: r.id, day: `R${i + 1}`, sub: r.format })))
+  .concat([{ id: "log", day: "Log", sub: "Changes" }]);
 function tabFromHash() {
   const id = location.hash.slice(1);
   return TABS.some((t) => t.id === id) ? id : null;
@@ -327,6 +332,164 @@ function roundTabHtml(round) {
 }
 
 // ------------------------------------------------------------------
+// Log tab: the score-change log (Prompt 4)
+// ------------------------------------------------------------------
+// The entries live in the scoreEdits collection, one per changed hole
+// (see functions/index.js, logScoreEdit). This tab keeps ONE live
+// listener on the whole collection, newest first, while it's open, and
+// filters by round and match on the page itself (the whole trip is a
+// few hundred entries, so loading them all is cheap and simple).
+
+let logEntries = [];
+let logLoaded = false;
+let logError = null;
+let stopLog = null;          // the listener's "unsubscribe" function
+let logFailed = false;       // true after an error, until the next deliberate retry
+let logRound = "all";        // filter: "all" or a round id
+let logMatch = "all";        // filter: "all" or a match id
+let drawnLogSig = null;      // what's on screen, to skip identical redraws
+
+function startLogListener() {
+  // After an error we don't retry on every redraw (that could become a
+  // loop of refused reads); only when the Log tab is opened again or
+  // the admin code is re-entered (see retryLog).
+  if (stopLog || logFailed) return;
+  stopLog = onSnapshot(
+    query(collection(db, "scoreEdits"), orderBy("syncedAt", "desc")),
+    (snapshot) => {
+      logEntries = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+      logLoaded = true;
+      logError = null;
+      render();
+    },
+    (error) => {
+      // Most likely the admin unlock is missing or stale on the server.
+      // Firestore has already stopped this listener after an error.
+      logError = error;
+      logFailed = true;
+      stopLog = null;
+      render();
+    }
+  );
+}
+
+// A deliberate retry: forget the last error so the next render starts
+// the listener again.
+function retryLog() {
+  if (!logFailed) return;
+  logFailed = false;
+  logError = null;
+  drawnLogSig = null;
+}
+
+function stopLogListener() {
+  if (!stopLog) return;
+  stopLog();
+  stopLog = null;
+}
+
+// "10:52 AM", or "Thu 10:52 AM" if not today. Firestore timestamps
+// arrive as Timestamp objects; toDate() turns them into a JS Date.
+function logTime(ts) {
+  if (!ts || typeof ts.toDate !== "function") return "—";
+  const d = ts.toDate();
+  const time = d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  return d.toDateString() === new Date().toDateString() ? time : `${d.toLocaleDateString([], { weekday: "short" })} ${time}`;
+}
+
+// One side's value: "5", best ball "4/5", empty "–".
+function logSide(value) {
+  if (Array.isArray(value)) return value.map((v) => (v == null ? "–" : v)).join("/");
+  return value == null ? "–" : String(value);
+}
+
+// A hole's scores, or "—" if it had none.
+function logScores(scores) {
+  return scores ? `USA ${logSide(scores.a)} – EU ${logSide(scores.b)}` : "—";
+}
+
+// "R1 · Match 2 · Hole 7"
+function logWhere(entry) {
+  const index = ROUNDS.findIndex((r) => r.id === entry.roundId) + 1;
+  return `R${index || "?"} · ${String(entry.matchId || "").replace("match", "Match ")} · Hole ${entry.hole}`;
+}
+
+function filteredLogEntries() {
+  return logEntries.filter(
+    (e) => (logRound === "all" || e.roundId === logRound) && (logMatch === "all" || e.matchId === logMatch)
+  );
+}
+
+function logRowHtml(entry) {
+  // Show the tap time only when it differs from the sync time by a
+  // minute or more (i.e. the score was saved with no signal).
+  let when = "";
+  if (entry.tappedAt && entry.syncedAt && typeof entry.tappedAt.toMillis === "function") {
+    const gap = Math.abs(entry.syncedAt.toMillis() - entry.tappedAt.toMillis());
+    if (gap >= 60 * 1000) when = ` · tapped ${logTime(entry.tappedAt)} (synced ${logTime(entry.syncedAt)})`;
+  }
+  return `
+    <li class="lg-row${entry.changed ? " is-changed" : ""}">
+      <div class="lg-top">
+        <span class="lg-time">${logTime(entry.syncedAt)}</span>
+        <span class="lg-where">${escapeHtml(logWhere(entry))}</span>
+        ${entry.changed ? '<span class="lg-tag">Changed</span>' : ""}
+      </div>
+      <div class="lg-scores">${logScores(entry.before)} <span aria-hidden="true">→</span><span class="visually-hidden">changed to</span> ${logScores(entry.after)}</div>
+      <div class="lg-who">${escapeHtml(entry.whoName || "Unknown")}${entry.whoSource === "phone" ? " (as reported by the phone)" : ""}${when}</div>
+    </li>
+  `;
+}
+
+function renderLogTab() {
+  const entries = filteredLogEntries();
+  // Redraw only if something visible changed (new entries or filters),
+  // so a score saved elsewhere doesn't reset an open dropdown.
+  const sig = JSON.stringify([logLoaded, logError && logError.code, logRound, logMatch, entries.map((e) => e.id)]);
+  if (drawnTab === "log" && sig === drawnLogSig) return;
+  drawnLogSig = sig;
+
+  const roundOptions =
+    `<option value="all">All rounds</option>` +
+    ROUNDS.map((r, i) => `<option value="${r.id}" ${r.id === logRound ? "selected" : ""}>R${i + 1} · ${r.format}</option>`).join("");
+  const round = ROUNDS.find((r) => r.id === logRound);
+  const matchOptions =
+    `<option value="all">All matches</option>` +
+    (round ? matchIds(round) : [])
+      .map((id) => `<option value="${id}" ${id === logMatch ? "selected" : ""}>${id.replace("match", "Match ")}</option>`)
+      .join("");
+
+  // Holes edited after their first entry, once each, oldest first.
+  const changedHoles = [...new Set(entries.filter((e) => e.changed).reverse().map(logWhere))];
+  const summary = changedHoles.length
+    ? `<p class="lg-summary">⚠ Changed after first entry: ${changedHoles.map((w) => escapeHtml(w.replace(/ · Match /, " M").replace(/ · Hole /, " h"))).join(", ")}</p>`
+    : "";
+
+  let body;
+  if (logError) {
+    body = `<p class="status-msg error">Couldn't load the log (${escapeHtml(logError.code || "error")}). Try "Use a different code" and enter the admin code again.</p>`;
+  } else if (!logLoaded) {
+    body = `<div class="skeleton-card"><div class="skeleton skeleton-line skeleton-title"></div><div class="skeleton skeleton-block"></div></div>`;
+  } else if (entries.length === 0) {
+    body = `<p class="st-note">No score changes logged${logRound === "all" ? " yet" : " for this selection"}.</p>`;
+  } else {
+    body = `${summary}<p class="st-note">${entries.length} ${entries.length === 1 ? "entry" : "entries"}, newest first.</p><ol class="lg-list">${entries.map(logRowHtml).join("")}</ol>`;
+  }
+
+  contentEl.innerHTML = `
+    <div class="ad-round-head">
+      <h2 class="section-title">Score-change log</h2>
+      <p class="rd-help">Every change to a hole's score: who, when, and from what to what. Read-only.</p>
+    </div>
+    <div class="lg-filters">
+      <label>Round <select id="log-round">${roundOptions}</select></label>
+      <label>Match <select id="log-match" ${round ? "" : "disabled"}>${matchOptions}</select></label>
+    </div>
+    ${body}
+  `;
+}
+
+// ------------------------------------------------------------------
 // Drawing
 // ------------------------------------------------------------------
 function renderTabs() {
@@ -356,6 +519,16 @@ function render() {
     contentEl.innerHTML = `<div class="skeleton-card"><div class="skeleton skeleton-line skeleton-title"></div><div class="skeleton skeleton-block"></div></div>`;
     return;
   }
+
+  // The Log tab is drawn by its own code (see "Log tab" below) and only
+  // listens to the log while it's open.
+  if (selectedTab === "log") {
+    startLogListener();
+    renderLogTab();
+    drawnTab = "log";
+    return;
+  }
+  stopLogListener();
 
   if (fullRebuild) {
     // Keep the add-player form's typed values if the roster redraws
@@ -399,6 +572,7 @@ document.getElementById("ad-tabs").addEventListener("click", (event) => {
   if (!button) return;
   selectedTab = button.dataset.tab;
   history.replaceState(null, "", `#${selectedTab}`);   // no extra Back-button step
+  if (selectedTab === "log") retryLog();
   render();
 });
 
@@ -492,6 +666,19 @@ contentEl.addEventListener("click", async (event) => {
 });
 
 // Team change saves immediately (same write as the old roster page).
+// Log tab filters. Choosing a round resets the match filter, since
+// match numbers belong to a round.
+contentEl.addEventListener("change", (event) => {
+  if (event.target.id === "log-round") {
+    logRound = event.target.value;
+    logMatch = "all";
+    renderLogTab();
+  } else if (event.target.id === "log-match") {
+    logMatch = event.target.value;
+    renderLogTab();
+  }
+});
+
 contentEl.addEventListener("change", async (event) => {
   const select = event.target;
   if (!select.matches(".team-select")) return;
@@ -555,6 +742,7 @@ for (const round of ROUNDS) {
 
 renderUnlockBar(document.getElementById("unlock"), "admin", () => {
   unlocked = true;
+  retryLog();   // a fresh admin unlock may fix an earlier "permission denied"
   document.getElementById("ad-locked-note").hidden = true;
   contentEl.hidden = false;
   render();

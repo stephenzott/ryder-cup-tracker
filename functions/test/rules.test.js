@@ -310,3 +310,51 @@ test("players: anyone can still read the roster", () => allowed(getDocs(collecti
 test("players: a non-admin still cannot write", () =>
   denied(setDoc(doc(alice, "players", "p1"), { name: "Test" })));
 test("secrets: still unreadable", () => denied(getDoc(doc(alice, "secrets", "config"))));
+
+// ==================================================================
+// SCORE-CHANGE LOG (Prompt 4): scoreEdits
+// Admin-code browsers can read; nobody can write, edit or delete.
+// ==================================================================
+
+// Write a document through the emulator's admin back door (skips rules),
+// the way the Cloud Function writes for real.
+async function plantAsServer(path, fields) {
+  const url = `http://${HOST}:${PORT}/v1/projects/${PROJECT_ID}/databases/${DATABASE_ID}/documents/${path}`;
+  const res = await fetch(url, {
+    method: "PATCH",
+    headers: { Authorization: "Bearer owner", "Content-Type": "application/json" },
+    body: JSON.stringify({ fields }),
+  });
+  assert.equal(res.status, 200);
+}
+
+let adminDb, playerDb;
+before(async () => {
+  // The secret admin code, a log entry, and two browsers: "dave" unlocks
+  // with the right admin code, "erin" picks a player (score level).
+  await plantAsServer("secrets/config", { adminCode: { stringValue: "letmein" } });
+  await plantAsServer("scoreEdits/evt1_h7", {
+    roundId: { stringValue: "round1" },
+    hole: { integerValue: "7" },
+    whoName: { stringValue: "Sam Smith" },
+  });
+  adminDb = firestoreAs("dave");
+  playerDb = firestoreAs("erin");
+  await setDoc(doc(adminDb, "unlocks", "dave"), { level: "admin", code: "letmein" });
+  await setDoc(doc(playerDb, "unlocks", "erin"), { level: "score", playerId: "p1", playerName: "Sam Smith" });
+});
+
+const entry = (db) => doc(db, "scoreEdits", "evt1_h7");
+
+test("scoreEdits: an admin browser can read an entry", () => allowed(getDoc(entry(adminDb))));
+test("scoreEdits: an admin browser can list the whole log", () => allowed(getDocs(collection(adminDb, "scoreEdits"))));
+test("scoreEdits: a score-level (player) browser cannot read", () => denied(getDoc(entry(playerDb))));
+test("scoreEdits: a score-level browser cannot list", () => denied(getDocs(collection(playerDb, "scoreEdits"))));
+test("scoreEdits: a browser that never unlocked cannot read", () => denied(getDoc(entry(alice))));
+test("scoreEdits: not signed in cannot read", () => denied(getDoc(entry(nobody))));
+test("scoreEdits: even an admin cannot create an entry", () =>
+  denied(setDoc(doc(adminDb, "scoreEdits", "fake"), { hole: 1 })));
+test("scoreEdits: even an admin cannot edit an entry", () => denied(updateDoc(entry(adminDb), { whoName: "Someone else" })));
+test("scoreEdits: even an admin cannot delete an entry", () => denied(deleteDoc(entry(adminDb))));
+test("scoreEdits: a player cannot create an entry", () =>
+  denied(setDoc(doc(playerDb, "scoreEdits", "fake"), { hole: 1 })));

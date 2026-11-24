@@ -50,9 +50,14 @@ Line numbers refer to the files as committed in `182a606`.
   sign-in traffic alone (`:482`).
 
 ### Rule 3: only the allowed files changed
-Checked with `git diff main..offline`:
+Checked with `git diff main..offline` at the end of stage 2:
 - **Unchanged:** `scoring.js`, `rounds-config.js`, `match-ui.js`,
   `firestore.rules`, `functions/index.js`, `functions/events.js`.
+  *(Prompt 4, the score-change log, later changed `firestore.rules` (a
+  `scoreEdits` block only, no existing line removed),
+  `functions/index.js` (a new `logScoreEdit` function, plus the event id
+  passed to the alert logic) and `functions/events.js` (correction
+  alerts). Every stage-2 audit point below still holds.)*
 - `firebase-init.js`: the cache setting (allowed), plus the emulator hookup
   moved in from `alerts.js` (you approved).
 - `round.js`: the save flow (allowed), the sync line, warnings and the
@@ -206,6 +211,21 @@ afterwards.
 16. Airplane mode off. Same expectations as step 10: "✓ Sent", 4 alerts on
     phones with alerts on, and the iPhone shows holes 5–8.
 
+### Correction and score log (Prompt 4)
+16a. On the Android, **with signal**, go back to **hole 8**. Change the
+     numbers so a **different side wins** (or it becomes halved) and Save.
+     **Expect:** one alert, **"Correction: …"**. It **replaces** the
+     earlier hole-8 alert on the lock screen rather than adding a new one.
+16b. On your iPhone: **Admin → Log**. **Expect:**
+     - every test hole listed, newest first;
+     - the hole-8 fix tagged **CHANGED**, with "⚠ Changed after first
+       entry: R4 M8 h8" at the top;
+     - the holes saved in airplane mode show "tapped … (synced …)".
+     - **Check the name line does NOT say "(as reported by the
+       phone)".** That proves the real server reports who saved (the
+       emulator couldn't). If it does say it, the log still works using the
+       phone's backup; just tell me.
+
 ### Optional: weak signal
 17. Somewhere with one bar (or in a lift or basement), save a hole. After
     about 8 s the card should say "saved on this phone", and the strip
@@ -217,12 +237,17 @@ afterwards.
     removes the test scores and pairing. When you later save the real
     Match 8 pairing in Admin, the match is recreated empty.
 19. `notificationLog` → delete **every** document whose name starts with
-    **`2027_round4_match8_`**: normally 8, `hole1` to `hole8` (plus `front`
-    if you scored hole 9 too).
+    **`2027_round4_match8_`**: `hole1` to `hole8`, the correction
+    (`fix-hole8-…`), plus `front` if you scored hole 9 too.
     - **Don't skip this.** Each alert is sent once per trip year, so
       leftover entries would silence those alerts for the real Match 8 on
       singles day.
-20. On both phones, set **Alerts → What to send** back to your usual choice.
+20. **Score log:** Firestore → `scoreEdits` → delete every document whose
+    `roundId` is `round4` and `matchId` is `match8`. Tip: the console's
+    **Filter** button with `matchId == match8` lists just them. Browsers
+    can't delete log entries (by design), so this has to happen in the
+    console, or the test's entries would sit in the trip's real log.
+20a. On both phones, set **Alerts → What to send** back to your usual choice.
 21. If the Android used the admin code: on any round page, tap **Use a
     different code** / **Not you? Switch**, and pick the owner's own name.
 22. **Expect a few leftover notes later.** When you save the real Round 4

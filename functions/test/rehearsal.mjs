@@ -92,6 +92,9 @@ save("Hole 6: Sam 4, Ben 5", 6, 4, 5);
 save("Hole 7: both 3 (halved)", 7, 3, 3);
 save("Hole 8, half-entered: only Sam's 4 so far", 8, 4, null);
 save("Hole 8 TYPO: Ben's score typed as 5 (should be 3)", 8, 4, 5);
+// Since Prompt 4 (offline project) this correction changes the hole's
+// winner, so it sends "Correction: EU wins hole 8" to "Every hole"
+// subscribers (same tag, replacing the wrong "USA wins hole 8").
 save("Hole 8 CORRECTED: Ben 3", 8, 4, 3);
 save("Hole 9: Sam 4, Ben 5 (front 9 done)", 9, 4, 5);
 save("Hole 10: Sam 5, Ben 4", 10, 5, 4);

@@ -26,7 +26,7 @@
 //
 // Sides are 'a' = USA and 'b' = EU, as in the Firestore data.
 
-import { db } from "./firebase-init.js";
+import { db, auth } from "./firebase-init.js";
 import { renderUnlockBar, getUnlockLevel, getUnlockPlayerId } from "./auth.js";
 import {
   collection,
@@ -646,6 +646,18 @@ matchesEl.addEventListener("click", async (event) => {
     if (hasNumber(aValue)) update[`holes.${hole}.a`] = aValue;
     if (hasNumber(bValue)) update[`holes.${hole}.b`] = bValue;
     if (Object.keys(update).length === 0) return;   // nothing entered: nothing to save
+    // Score-change log (Prompt 4): also note WHEN this phone's Save was
+    // tapped, as milliseconds by the phone's own clock. The server-side
+    // log (functions/index.js, logScoreEdit) records it next to the
+    // server's own sync time, which can be much later for a score saved
+    // with no signal. Scoring only ever reads a hole's `a` and `b`
+    // (scoring.js holeWinner), so this extra field can't change results.
+    update[`holes.${hole}.t`] = Date.now();
+    // Backup for the log's "who": this browser's anonymous sign-in id.
+    // The server normally learns who saved from the sign-in itself; this
+    // is only used if it doesn't (same honor-system trust as "Who are
+    // you?"). Skipped if, unusually, there's no signed-in user yet.
+    if (auth.currentUser) update[`holes.${hole}.u`] = auth.currentUser.uid;
 
     // Note what this phone saved, so the card can show it as waiting
     // and later confirm or flag it (see my-entries.js).

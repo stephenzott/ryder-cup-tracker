@@ -3741,3 +3741,112 @@ body.has-offline-banner {
   color: var(--ok);
   font-weight: 600;
 }
+
+/* ==================================================================
+   14. ADMIN SCORE-CHANGE LOG  (Admin page "Log" tab, js/admin.js;
+   Prompt 4). New classes only (lg-...); reuses the tokens, the amber
+   warning colors from section 13 and the existing select styling.
+   ================================================================== */
+
+/* Round / Match filters side by side, wrapping on a narrow phone. */
+.lg-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+}
+
+.lg-filters label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.lg-filters select {
+  min-height: 44px;   /* phone tap target */
+}
+
+/* "⚠ Changed after first entry: R1 M2 h7, ..." */
+.lg-summary {
+  margin: var(--space-3) 0 0;
+  padding: var(--space-2) var(--space-3);
+  background: var(--warn-tint);
+  color: var(--warn);
+  border-left: 4px solid var(--warn);
+  border-radius: var(--radius-small);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+/* The list: one white card, rows divided by hairlines, newest first. */
+.lg-list {
+  list-style: none;
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  background: var(--card);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+}
+
+.lg-row {
+  padding: var(--space-3) var(--space-4);
+  border-top: 1px solid var(--border);
+}
+
+.lg-row:first-child {
+  border-top: none;
+}
+
+/* A hole edited after its first entry gets a thin amber bar on the left. */
+.lg-row.is-changed {
+  box-shadow: inset 4px 0 0 var(--warn);
+}
+
+/* Time · where · CHANGED, on one line (wraps if needed). */
+.lg-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px var(--space-2);
+}
+
+.lg-time {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.lg-where {
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  color: var(--navy);
+}
+
+.lg-tag {
+  padding: 1px var(--space-2);
+  border-radius: var(--radius-pill);
+  background: var(--warn-tint);
+  color: var(--warn);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* "USA 5 – EU 4 → USA 5 – EU 5" */
+.lg-scores {
+  margin-top: 2px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+
+.lg-who {
+  margin-top: 2px;
+  font-size: 0.85rem;
+  color: var(--muted);
+}

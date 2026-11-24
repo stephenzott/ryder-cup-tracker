@@ -4,7 +4,9 @@
 //
 // Think of it as three functions:
 //
-//   detectEvents(before, after)        match before + after -> events
+//   detectEvents(before, after, opts)  match before + after -> events
+//                                      (opts.correctionId also turns on
+//                                      correction alerts, Prompt 4)
 //   pickEvent(events, sub, team)       one subscriber -> their one event
 //   buildMessage(event, ...)           event -> notification text
 //
@@ -42,7 +44,8 @@ function sideFromMargin(margin) {
 // The newest hole decided by this update: a hole whose winner was null
 // (not decided) before and is not null after. If one save decides
 // several holes at once, only the highest-numbered one counts. A hole
-// that was ALREADY decided and changed is a correction: ignored.
+// that was ALREADY decided and changed is a correction: not counted here
+// (see detectCorrections below).
 function newestDecidedHole(before, after) {
   const holesBefore = before.holes || {};
   const holesAfter = after.holes || {};
@@ -69,10 +72,15 @@ function newestDecidedHole(before, after) {
 //     reports all three results, so the segment would be redundant).
 //     gainTeam = sign of that segment's margin.
 //   - hole: see newestDecidedHole. gainTeam = the hole's winner.
-export function detectEvents(before, after) {
+export function detectEvents(before, after, { correctionId = null } = {}) {
   const was = scoreMatch(before);
   const now = scoreMatch(after);
   const events = [];
+
+  // Corrections (Prompt 4) only when the caller passes a correctionId
+  // (the trigger passes its event id). Without one, this function
+  // behaves exactly as it always has.
+  if (correctionId) events.push(...detectCorrections(before, after, was, now, correctionId));
 
   const finalHappened = !was.overall.complete && now.overall.complete;
   if (finalHappened) {
@@ -97,6 +105,74 @@ export function detectEvents(before, after) {
   }
 
   return events;
+}
+
+// ------------------------------------------------------------------
+// CORRECTIONS (Prompt 4). Announced only when a RESULT changes:
+//   - a hole that was already decided now has a different winner
+//     (e.g. USA -> halved). A stroke fixed without changing the winner
+//     stays silent;
+//   - a nine that was already complete now has a different result;
+//   - a match that was already final now has different points (then the
+//     nine corrections are skipped: the final message lists all three).
+// Each correction event carries:
+//   correction: true, gainTeam (the NEW winner), prevGainTeam (the OLD
+//   winner), and a key with the trigger's event id in it ("fix-hole7-
+//   <id>"), so each real correction is announced once, and a second run
+//   of the same trigger event is caught by the usual dedupe.
+// ------------------------------------------------------------------
+function winnerToTeam(winner) {
+  return winner === "halved" || winner == null ? null : winner;
+}
+
+function detectCorrections(before, after, was, now, correctionId) {
+  const fixes = [];
+
+  const finalFixed =
+    was.overall.complete &&
+    now.overall.complete &&
+    (was.points.a !== now.points.a || was.points.b !== now.points.b);
+  if (finalFixed) {
+    const side = (p) => (p.a > p.b ? "a" : p.b > p.a ? "b" : null);
+    fixes.push({
+      level: "final",
+      key: `fix-final-${correctionId}`,
+      correction: true,
+      gainTeam: side(now.points),
+      prevGainTeam: side(was.points),
+    });
+  } else {
+    for (const key of ["front", "back"]) {
+      if (!was[key].complete || !now[key].complete) continue;
+      const oldSide = sideFromMargin(was[key].margin);
+      const newSide = sideFromMargin(now[key].margin);
+      if (oldSide !== newSide) {
+        fixes.push({ level: "segment", key: `fix-${key}-${correctionId}`, correction: true, gainTeam: newSide, prevGainTeam: oldSide });
+      }
+    }
+  }
+
+  // The highest-numbered hole whose winner changed (one save from a
+  // phone only ever changes one hole).
+  const holesBefore = before.holes || {};
+  const holesAfter = after.holes || {};
+  let fixedHole = null;
+  for (let h = 1; h <= 18; h++) {
+    const w = holeWinner(holesBefore[String(h)], h, before);
+    const n = holeWinner(holesAfter[String(h)], h, after);
+    if (w != null && n != null && w !== n) fixedHole = { hole: h, was: w, now: n };
+  }
+  if (fixedHole) {
+    fixes.push({
+      level: "hole",
+      key: `fix-hole${fixedHole.hole}-${correctionId}`,
+      hole: fixedHole.hole,
+      correction: true,
+      gainTeam: winnerToTeam(fixedHole.now),
+      prevGainTeam: winnerToTeam(fixedHole.was),
+    });
+  }
+  return fixes;
 }
 
 // ==================================================================
@@ -125,10 +201,21 @@ function isEligible(event, sub, team) {
   const scope = team ? sub.scope : "all";
   if (scope === "all") return true;
 
-  // "mine" / "opposing" never get halved (null) events.
-  if (event.gainTeam == null) return false;
-  if (scope === "mine") return event.gainTeam === team;
-  if (scope === "opposing") return event.gainTeam !== team;
+  // A correction goes to anyone who would have received EITHER the
+  // original result or the new one: someone on "My team" who was told
+  // "USA wins hole 7" must hear that it's now halved (Prompt 4).
+  if (event.correction) {
+    return teamScopeAllows(event.gainTeam, scope, team) || teamScopeAllows(event.prevGainTeam, scope, team);
+  }
+  return teamScopeAllows(event.gainTeam, scope, team);
+}
+
+// "mine" / "opposing" for one result. They never get halved (null)
+// results. (Unchanged rule, moved here so corrections can reuse it.)
+function teamScopeAllows(gainTeam, scope, team) {
+  if (gainTeam == null) return false;
+  if (scope === "mine") return gainTeam === team;
+  if (scope === "opposing") return gainTeam !== team;
   return false;                                         // unknown scope
 }
 
@@ -222,6 +309,11 @@ export function buildMessage(event, { roundId, matchId, after, namesById }) {
     body = `${names}\nFront ${segmentWord(scored.front)} · Back ${segmentWord(scored.back)} · Overall ${overallText}`;
     tag = `${roundId}-${matchId}-final`;
   }
+
+  // A correction (Prompt 4) is the same message with "Correction: " in
+  // front, and the SAME tag, so on the lock screen it replaces the
+  // earlier (now wrong) alert for that hole, nine or match.
+  if (event.correction) title = `Correction: ${title}`;
 
   return { title, body, tag, url: `/scoreboard.html#${roundId}` };
 }

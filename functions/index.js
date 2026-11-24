@@ -3,6 +3,9 @@
 //   notifyOnMatchUpdate   runs when a match document changes and pushes
 //                         alerts to subscribed phones
 //   sendTestNotification  the Alerts page's "Send me a test notification"
+//   logScoreEdit          runs when a match document changes and records
+//                         each changed hole in scoreEdits, for the Admin
+//                         page's score-change log (Prompt 4)
 //
 // The decisions (which events happened, who gets which) live in
 // events.js, which has no Firebase code and is unit-tested on its own.
@@ -11,9 +14,10 @@
 //
 // SAFETY RULES this file follows (see CLAUDE.md rule 5):
 //   - It NEVER writes to matches, players or rounds. Its only writes are
-//     notificationLog (dedupe), testPushLimits (rate limit) and, for a
-//     dead token, that one pushSubscriptions document's enabled/token.
-//     So it can't trigger itself: it only listens to matches.
+//     notificationLog (dedupe), testPushLimits (rate limit), scoreEdits
+//     (the score-change log) and, for a dead token, that one
+//     pushSubscriptions document's enabled/token. So nothing can trigger
+//     itself: the triggers only listen to matches.
 //   - Running twice for the same change sends nothing the second time
 //     (notificationLog, below).
 //   - maxInstances 5, no automatic retries, no loops over unbounded data.
@@ -23,7 +27,7 @@
 
 import { appendFileSync } from "node:fs";
 import { setGlobalOptions, logger } from "firebase-functions/v2";
-import { onDocumentUpdated } from "firebase-functions/v2/firestore";
+import { onDocumentUpdated, onDocumentUpdatedWithAuthContext } from "firebase-functions/v2/firestore";
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { initializeApp } from "firebase-admin/app";
 import { getFirestore, FieldValue, Timestamp } from "firebase-admin/firestore";
@@ -33,6 +37,7 @@ import { detectEvents, pickEvent, teamFromValue, buildMessage, logId, TEST_MESSA
 import { ROUNDS } from "./rounds-config.js";
 // The trip year (from public/js/match-ui.js's CURRENT_YEAR, via sync).
 import { CURRENT_YEAR } from "./trip-year.js";
+import { diffHoles, describeWho, pickUid } from "./score-log.js";
 
 // ------------------------------------------------------------------
 // Settings
@@ -191,7 +196,7 @@ async function claimEvent(roundId, matchId, event) {
 //   before, after      the match document's data before/after the change
 //   roundId, matchId   from the document path
 // Returns a summary object (also used for the log line).
-export async function handleMatchUpdate({ before, after, roundId, matchId }) {
+export async function handleMatchUpdate({ before, after, roundId, matchId, eventId = null }) {
   const summary = { roundId, matchId, events: [], recipients: 0, sent: 0, failed: 0, dead: 0, byPlatform: {} };
 
   // Only real rounds (a stray document elsewhere is ignored).
@@ -200,7 +205,9 @@ export async function handleMatchUpdate({ before, after, roundId, matchId }) {
   // 1. What happened? Most saves (a single stroke typed in, half a
   //    best-ball pair, a correction) produce no events: stop here with
   //    no further reads.
-  const events = detectEvents(before, after);
+  //    eventId (the trigger's event id) also turns on correction alerts
+  //    (Prompt 4); see detectCorrections in events.js.
+  const events = detectEvents(before, after, { correctionId: eventId });
   if (events.length === 0) return { ...summary, skipped: "no events" };
 
   // 2. Kill switch, read once per run.
@@ -279,8 +286,103 @@ export const notifyOnMatchUpdate = onDocumentUpdated(
     const before = event.data?.before?.data() || {};
     const after = event.data?.after?.data() || {};
     const { roundId, matchId } = event.params;
-    const summary = await handleMatchUpdate({ before, after, roundId, matchId });
+    const summary = await handleMatchUpdate({ before, after, roundId, matchId, eventId: event.id });
     logger.info(summaryLine(summary));
+  }
+);
+
+// ==================================================================
+// THE SCORE-CHANGE LOG (Prompt 4)
+// ==================================================================
+
+// Runs on every match update, like notifyOnMatchUpdate, but as its own
+// function so the alert code is untouched by it. For each hole whose
+// USA/EU numbers changed (score-log.js diffHoles), it writes one
+// document to scoreEdits:
+//   { roundId, matchId, hole, before, after, changed,
+//     syncedAt   when the server accepted the save (for a score saved
+//                with no signal, that's when the phone found signal),
+//     tappedAt   when Save was tapped, by the phone's clock (or null),
+//     uid, authType, level, playerId, whoName,   who saved it
+//     loggedAt   when this entry was written }
+//
+// "WithAuthContext" is a variant of the trigger that also says WHO made
+// the change: authType "app_user" plus authId (the browser's anonymous
+// uid) for a phone; something else for the Firebase console or a
+// server. The uid is then looked up in unlocks/{uid} to get the name
+// picked on "Who are you?" (honor system, as everywhere in this app).
+//
+// SAFETY (CLAUDE.md rule 7):
+//   - Writes only to scoreEdits, which no trigger listens to, so it can
+//     never set itself off.
+//   - Safe to run twice for the same change: each entry's id is built
+//     from the trigger event's id plus the hole number, and written with
+//     create(), which fails (and is skipped) if the entry already exists.
+//   - At most 18 entries per run (one per hole); maxInstances 5 and no
+//     automatic retries come from setGlobalOptions above.
+//   - Nothing is ever deleted or edited here, and the rules let nobody
+//     else write to scoreEdits either.
+export const logScoreEdit = onDocumentUpdatedWithAuthContext(
+  { document: "rounds/{roundId}/matches/{matchId}", database: DATABASE_ID },
+  async (event) => {
+    const before = event.data?.before?.data() || {};
+    const after = event.data?.after?.data() || {};
+    const { roundId, matchId } = event.params;
+
+    const edits = diffHoles(before, after);
+    if (edits.length === 0) return;   // pairings/strokes change or same-number re-save
+
+    // Who: the browser the server reports, or else the one the phone
+    // stamped in the hole (pickUid). Each browser's unlock record is
+    // read once, then reused (a phone save only changes one hole).
+    const unlockCache = new Map();
+    async function unlockFor(uid) {
+      if (!uid) return null;
+      if (!unlockCache.has(uid)) {
+        const snap = await db.collection("unlocks").doc(uid).get();
+        unlockCache.set(uid, snap.exists ? snap.data() : null);
+      }
+      return unlockCache.get(uid);
+    }
+
+    // event.time is when the database accepted the change.
+    const syncedAt = Timestamp.fromDate(new Date(event.time));
+    let written = 0;
+    const names = [];
+    for (const edit of edits) {
+      const { uid, source } = pickUid(event.authType, event.authId, edit.phoneUid);
+      const who = describeWho(event.authType, await unlockFor(uid), uid);
+      names.push(who.whoName);
+      const entry = {
+        roundId,
+        matchId,
+        hole: edit.hole,
+        before: edit.before,
+        after: edit.after,
+        changed: edit.changed,
+        syncedAt,
+        tappedAt: edit.tappedAtMs == null ? null : Timestamp.fromMillis(edit.tappedAtMs),
+        uid,
+        whoSource: source,                          // "server", "phone" or null
+        authType: event.authType || "unknown",
+        level: who.level,
+        playerId: who.playerId,
+        whoName: who.whoName,
+        loggedAt: FieldValue.serverTimestamp(),
+      };
+      try {
+        // Event ids are plain letters/digits today; anything else is
+        // swapped for "-" so the id is always a valid document name.
+        const safeEventId = String(event.id).replace(/[^A-Za-z0-9_-]/g, "-");
+        await db.collection("scoreEdits").doc(`${safeEventId}_h${edit.hole}`).create(entry);
+        written++;
+      } catch (error) {
+        // gRPC code 6 = ALREADY_EXISTS: this event was already logged.
+        if (error?.code === 6 || /already exists/i.test(error?.message || "")) continue;
+        throw error;
+      }
+    }
+    logger.info(`scoreEdits ${roundId}/${matchId}: ${written} of ${edits.length} holes logged (who: ${[...new Set(names)].join(", ")})`);
   }
 );
 

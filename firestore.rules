@@ -157,5 +157,16 @@ service cloud.firestore {
       allow read, delete: if isOwner();
       allow create, update: if isOwner() && validSubscription(request.resource.data);
     }
+
+    // Score-change log (Prompt 4). One entry per changed hole, written
+    // ONLY by the Cloud Function logScoreEdit (functions/index.js),
+    // which uses admin access and so bypasses these rules. Browsers can
+    // never create, edit or delete an entry, so the log can't be
+    // tampered with from the site. Only a browser unlocked with the
+    // admin code can read it (the Admin page's Log tab).
+    match /scoreEdits/{entryId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
   }
 }

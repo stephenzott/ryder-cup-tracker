@@ -295,3 +295,75 @@ test("log ids and match labels", () => {
   assert.notEqual(logId(2028, "round2", "match2", { key: "final" }), logId(2027, "round2", "match2", { key: "final" }));
   assert.equal(matchLabel("match3"), "Match 3");
 });
+
+// ==================================================================
+// Corrections (Prompt 4): only when a correctionId is passed, and only
+// when a RESULT changes.
+// ==================================================================
+const FIX = { correctionId: "evt1" };
+
+test("correction: without a correctionId, behaviour is exactly as before", () => {
+  const before = match([...range(1, 6, "a"), [7, 4, 5]]);
+  const after = match([...range(1, 6, "a"), [7, 4, 4]]);
+  assert.deepEqual(detectEvents(before, after), []);
+});
+
+test("correction: a hole's winner changes -> one hole correction", () => {
+  const before = match([...range(1, 6, "a"), [7, 4, 5]]);   // USA won 7
+  const after = match([...range(1, 6, "a"), [7, 4, 4]]);    // now halved
+  const events = detectEvents(before, after, FIX);
+  assert.deepEqual(brief(events), ["fix-hole7-evt1:-"]);
+  assert.equal(events[0].correction, true);
+  assert.equal(events[0].prevGainTeam, "a");
+});
+
+test("correction: a stroke fixed but same winner -> silent", () => {
+  const before = match([...range(1, 6, "a"), [7, 4, 6]]);
+  const after = match([...range(1, 6, "a"), [7, 4, 5]]);    // USA still wins
+  assert.deepEqual(detectEvents(before, after, FIX), []);
+});
+
+test("correction: a completed nine's result flips -> segment + hole corrections", () => {
+  // Front 9: USA wins 1, EU wins 2-3? Build: USA wins hole 1, rest halved -> USA wins front by 1.
+  const front = [[1, 4, 5], ...range(2, 9, "halved")];
+  const before = match(front);
+  const after = match([[1, 4, 4], ...range(2, 9, "halved")]);   // hole 1 now halved -> front halved
+  const events = detectEvents(before, after, FIX);
+  assert.deepEqual(brief(events).sort(), ["fix-front-evt1:-", "fix-hole1-evt1:-"]);
+});
+
+test("correction: a finished match's points change -> final correction, no nine correction", () => {
+  const allA = range(1, 18, "a");
+  const before = match(allA);
+  // Flip the front: EU wins 1-9 instead -> front EU, back USA, overall halved.
+  const after = match([...range(1, 9, "b"), ...range(10, 18, "a")]);
+  const events = detectEvents(before, after, FIX);
+  const keys = brief(events);
+  assert.ok(keys.some((k) => k.startsWith("fix-final-evt1")));
+  assert.ok(!keys.some((k) => k.startsWith("fix-front")));
+});
+
+test("correction: 'My team' subscriber told USA won still hears it's now halved", () => {
+  const event = { level: "hole", key: "fix-hole7-x", hole: 7, correction: true, gainTeam: null, prevGainTeam: "a" };
+  assert.ok(pickEvent([event], { level: "hole", scope: "mine" }, "a"));
+  assert.equal(pickEvent([event], { level: "hole", scope: "mine" }, "b"), null);   // EU fan never heard either result
+  assert.ok(pickEvent([event], { level: "hole", scope: "opposing" }, "b"));     // EU fan on "other team" heard USA won
+});
+
+test("correction: hole correction only reaches 'Every hole' subscribers; a nine flip reaches 'Segment' too", () => {
+  const holeFix = { level: "hole", key: "fix-hole7-x", hole: 7, correction: true, gainTeam: null, prevGainTeam: "a" };
+  const nineFix = { level: "segment", key: "fix-front-x", correction: true, gainTeam: null, prevGainTeam: "a" };
+  assert.equal(pickEvent([holeFix], { level: "segment", scope: "all" }, null), null);
+  assert.equal(pickEvent([holeFix, nineFix], { level: "segment", scope: "all" }, null).key, "fix-front-x");
+  assert.equal(pickEvent([holeFix, nineFix], { level: "hole", scope: "all" }, null).key, "fix-front-x");   // biggest wins
+});
+
+test("correction message: 'Correction: ' prefix and the same tag as the original alert", () => {
+  const after = match([...range(1, 6, "a"), [7, 4, 4]]);
+  const names = { pa1: "Sam Smith", pa2: "Al Adams", pb1: "Ben Brown", pb2: "Ed Evans" };
+  const fix = buildMessage({ level: "hole", key: "fix-hole7-x", hole: 7, correction: true, gainTeam: null, prevGainTeam: "a" }, { roundId: "round1", matchId: "match2", after, namesById: names });
+  const normal = buildMessage({ level: "hole", key: "hole7", hole: 7, gainTeam: null }, { roundId: "round1", matchId: "match2", after, namesById: names });
+  assert.equal(fix.title, `Correction: ${normal.title}`);
+  assert.equal(fix.tag, normal.tag);
+  assert.equal(fix.body, normal.body);
+});
