@@ -1,13 +1,11 @@
 # OS cruft
 .DS_Store
 
-# Old Jekyll/markdown version of the site — kept locally for reference,
-# not part of the new Firebase app's history.
-golf-trip-site/
-golf-trip-tracker.zip
-
-# Personal files that land in this folder but aren't part of the app
-GolfScoreboard.zip
+# Old files kept locally for reference, not part of the app's history:
+# the old Jekyll/markdown site (golf-trip-site/, golf-trip-tracker.zip),
+# the old single-page site ("AZ Rider cup website.html") and a personal
+# zip (GolfScoreboard.zip). Moved here in the offline project, Prompt 6.
+archive/
 
 # Firebase CLI local state/logs
 .firebase/
