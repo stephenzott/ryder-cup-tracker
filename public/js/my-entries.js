@@ -36,7 +36,7 @@ const WARNINGS_KEY = `rydercup_sync_warnings_${CURRENT_YEAR}`;
 // ball an array of numbers/nulls, one per player).
 //
 // One warning per hole that needs the player's attention, same key:
-//   { type: "changed" | "refused", roundId, matchId, hole,
+//   { type: "changed" | "refused" | "cleared", roundId, matchId, hole,
 //     entered: { a, b }, now: { a, b } (changed only), reason (refused only) }
 
 function load(key) {
@@ -116,8 +116,16 @@ export function reconcileMatch(roundId, matchId, holes) {
     if (!key.startsWith(prefix)) continue;
     const hole = Number(key.slice(prefix.length));
     const server = holes[String(hole)] || {};
+    // An admin "Clear hole" (round.js) leaves the hole with no scores but
+    // with its tap time (t): that's how a deliberate clear is told apart
+    // from a score that was lost (no hole at all).
+    const cleared = Boolean(holes[String(hole)]) && server.a == null && server.b == null && server.t != null;
 
-    if (sideConflicts(note.a, server.a) || sideConflicts(note.b, server.b)) {
+    if (cleared) {
+      warnings[key] = { type: "cleared", roundId, matchId, hole, entered: { a: note.a, b: note.b } };
+      delete entries[key];
+      changed = true;
+    } else if (sideConflicts(note.a, server.a) || sideConflicts(note.b, server.b)) {
       // Keep any "refused" warning already there (it's the more
       // specific explanation of the same event).
       if (!warnings[key]) {
@@ -166,6 +174,19 @@ export function warningsForMatch(roundId, matchId) {
     .filter(([key]) => key.startsWith(prefix))
     .map(([key, w]) => ({ key, ...w }))
     .sort((x, y) => x.hole - y.hole);
+}
+
+// Forget this phone's note and any warning for one hole (pain points
+// item 2: the admin cleared that hole on purpose, so there's nothing to
+// track or warn about from this phone).
+export function forgetEntry(roundId, matchId, hole) {
+  const key = noteKey(roundId, matchId, hole);
+  const entries = load(ENTRIES_KEY);
+  const warnings = load(WARNINGS_KEY);
+  delete entries[key];
+  delete warnings[key];
+  store(ENTRIES_KEY, entries);
+  store(WARNINGS_KEY, warnings);
 }
 
 // The OK button.

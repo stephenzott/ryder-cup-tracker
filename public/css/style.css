@@ -3965,3 +3965,164 @@ body.has-offline-banner {
   font-size: 1.3rem;
   color: var(--navy);
 }
+
+/* ==================================================================
+   16. PAIN-POINTS WORK  (round pages; js/round.js). New classes only.
+   ================================================================== */
+
+/* --- Item 1: a match folded into one tappable row ---
+   The whole card is one button. The base button style (navy fill,
+   white text) is switched off so it looks like the card itself. */
+.rd-card-collapsed {
+  padding: 0;
+}
+
+.rd-expand {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px var(--space-2);
+  width: 100%;
+  min-height: 52px;
+  padding: var(--space-2) var(--space-3);
+  border: none;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  border-radius: var(--radius-card);
+}
+
+.rd-expand:hover {
+  background: var(--bg);
+}
+
+.rd-row-no {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--navy);
+}
+
+/* Names take the middle and may wrap under the match number on a
+   narrow phone; the status always stays at the right. */
+.rd-row-names {
+  flex: 1 1 8em;
+  min-width: 0;
+  font-size: 0.88rem;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.rd-row-end {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.rd-row-chev {
+  font-size: 0.9rem;
+  color: var(--navy);
+}
+
+/* Small ⚠ / ⏳ markers on a closed card. */
+.rd-row-flag {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.rd-row-flag.is-warn {
+  color: var(--warn);
+}
+
+/* Status pill + the ▴ "collapse" button, side by side at the card top. */
+.rd-top-right {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.rd-collapse {
+  min-width: 44px;
+  padding: 0;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--navy);
+  font-size: 0.9rem;
+}
+
+.rd-collapse:hover {
+  background: var(--bg);
+}
+
+/* --- Item 2: admin "Clear hole" ---
+   Quiet outlined text button; red once armed ("Tap again…"). */
+.rd-clear-hole {
+  width: 100%;
+  margin-top: var(--space-2);
+  border: 1px dashed var(--muted);
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.rd-clear-hole.is-armed {
+  border: 1px solid var(--error);
+  background: var(--error);
+  color: var(--on-navy);
+}
+
+.rd-clear-error {
+  margin: var(--space-1) 0 0;
+}
+
+/* --- Item 7: best ball's single quick-pick grid ---
+   The active player's label + box get a navy outline; the one grid
+   sits below both teams, labelled with that player's name. */
+.rd-player {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: -4px;
+  padding: 4px;
+  border-radius: var(--radius-small);
+}
+
+.rd-player.is-active {
+  box-shadow: 0 0 0 2px var(--navy);
+  background: var(--card);
+}
+
+.rd-quick-single {
+  margin-top: var(--space-2);
+}
+
+.rd-quick-for {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--navy);
+}
+
+/* Best ball's single grid spans the whole card, so its 4 quick picks
+   fit in one row (each ~70px wide on a 360px phone). */
+.rd-quick-single .rd-quick {
+  grid-template-columns: repeat(4, 1fr);
+}
+
+/* An unpaired match slot on one line, the same height as a collapsed
+   match row. */
+.rd-card-slim {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px var(--space-2);
+  min-height: 52px;
+  padding: var(--space-2) var(--space-3);
+}
+
+.rd-card-slim .rd-empty-note {
+  margin: 0;
+}

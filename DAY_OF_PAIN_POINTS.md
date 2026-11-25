@@ -1,9 +1,13 @@
-# Day-of pain points (not built)
+# Day-of pain points
 
 Things noticed during Prompt 5 (day-of usability polish, commit `1c9da7a`)
-that could bother 16 players on a walking-only, 36-hole Friday. **None of
-these are built.** They're here so you can decide later. Items 3 and 9 need
-no code, just a line in the group message.
+that could bother 16 players on a walking-only, 36-hole Friday.
+
+**Status (2026-11-25, branch `pain-points`):**
+- **Built:** items 1, 2 and 7 (see "What was built" at the bottom).
+- **Covered in person:** items 3, 4, 8 and 9 go in your talk the day before
+  the tournament.
+- **Not built:** items 5 and 6.
 
 | # | Pain point | Why it matters | Possible fix | Effort |
 |---|---|---|---|---|
@@ -22,3 +26,27 @@ no code, just a line in the group message.
 Plain text, ready to paste:
 
 > One person per match enters the scores (say the USA side), so two phones don't fight over the same hole. If your screen keeps locking, set Auto-Lock to 5 minutes for the round. And if you get a burst of score alerts all at once, that's just a phone that was out of signal catching up.
+
+## What was built (branch `pain-points`, not yet deployed)
+
+- **Item 1, collapsed matches:** on round pages every match starts as a
+  one-line row (match, names, status), except your own, which starts
+  open.
+  - Tap a row to open it, and ▴ to close it. A match you open stays open
+    until you leave the page.
+  - A closed row shows ⚠ or ⏳ if that match has a warning or scores
+    waiting to send.
+  - Unpaired slots are one slim line too.
+- **Item 2, admin "Clear hole":** admin-unlocked browsers see "Clear hole N
+  (admin)" under Save when the hole on screen has a score.
+  - It takes two taps: the first turns it red, "Tap again to clear hole 7
+    (USA 5 – EU 4)"; a second tap within 5 seconds clears it.
+  - The score log records it as cleared, with who and when. No alert is
+    sent.
+  - Any other phone that had entered that hole shows "Hole 7 was cleared
+    by the organizer…".
+- **Item 7, best ball:** one quick-pick row for the active (outlined)
+  player instead of four 2×2 grids.
+  - Picking a number moves on to the next player; tap a name or box to
+    jump.
+  - The card is 922 px instead of 1,056.

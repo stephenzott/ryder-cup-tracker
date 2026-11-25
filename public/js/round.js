@@ -50,6 +50,7 @@ import {
   markRefused,
   warningsForMatch,
   dismissWarning,
+  forgetEntry,
 } from "./my-entries.js";
 // Shared match-drawing pieces (also used by the scoreboard).
 import {
@@ -152,6 +153,34 @@ let regraceTimer = null;
 // the first time a match is rendered (see currentHoleFor below).
 const currentHoleByMatch = {};
 
+// ------------------------------------------------------------------
+// Pain-points work: three bits of purely local page state (never saved
+// anywhere; they reset when the page is reopened).
+// ------------------------------------------------------------------
+
+// Item 1, collapsed match cards. Every match starts collapsed to a
+// one-line row except YOUR match, which starts open. Tapping a row
+// opens it; tapping ▴ closes it. openOverride remembers those taps
+// (matchId -> true/false) until you leave the page.
+const openOverride = {};
+function isOpen(matchId, mine) {
+  return matchId in openOverride ? openOverride[matchId] : mine;
+}
+
+// Item 2, admin "Clear hole". The first tap "arms" the button (it turns
+// red and asks for a second tap); a second tap within 5 seconds clears
+// the hole. armedClear = { matchId, hole, until } or null.
+// clearError = { matchId, text } if the server refused a clear.
+const CLEAR_CONFIRM_MS = 5000;
+let armedClear = null;
+let clearError = null;
+
+// Item 7, best ball's single quick-pick grid. Only one player at a time
+// is "active" (highlighted); the one grid of quick-pick numbers fills
+// that player's box, then moves on to the next player. Keys look like
+// "a:0" (USA, first player) ... "b:1" (EU, second player).
+const activePlayerByMatch = {};
+
 // Unsaved entries ("drafts"), keyed "match3:7" (match + hole) ->
 // { a, b } in the same shape Save writes (a number, or an array of
 // numbers for best ball). The page redraws whenever ANY match changes
@@ -252,7 +281,7 @@ function sideComplete(value) {
 // One − [ box ] + stepper. The buttons only change the box's value
 // (see the click handler below); Save reads the boxes exactly as before.
 // The empty box shows par as a faint hint (placeholder).
-function stepperHtml(matchId, side, playerIndex, value, par, who, holeNum) {
+function stepperHtml(matchId, side, playerIndex, value, par, who, holeNum, { withQuickPicks = true } = {}) {
   const indexAttr = playerIndex == null ? "" : ` data-player-index="${playerIndex}"`;
   const target = `data-match-id="${matchId}" data-side="${side}"${indexAttr}`;
   return `
@@ -262,7 +291,7 @@ function stepperHtml(matchId, side, playerIndex, value, par, who, holeNum) {
              value="${value}" placeholder="${par}" aria-label="${who}, hole ${holeNum} strokes" />
       <button type="button" class="rd-step" ${target} data-step="1" aria-label="One more for ${who}">+</button>
     </div>
-    ${quickPickHtml(target, value, par, who)}
+    ${withQuickPicks ? quickPickHtml(target, value, par, who) : ""}
   `;
 }
 
@@ -318,20 +347,53 @@ function renderHoleInputs(matchId, data, currentHole, sideA, sideB) {
     return `<div class="rd-inputs">${group("a", "USA", sideA)}${group("b", "EU", sideB)}</div>`;
   }
 
+  // Best ball (pain points item 7): each player's label + box sits in
+  // an .rd-player wrapper, and only ONE quick-pick grid is drawn, for
+  // the active player (see activePlayerFor), below both teams.
+  const active = activePlayerFor(matchId, data, currentHole, sideA, sideB);
   const group = (sideKey, team, ids) => `
     <div class="rd-input-group rd-input-${team.toLowerCase()}">
       <div class="rd-input-team">${team}</div>
       ${ids
         .map(
           (pid, i) => `
-            <div class="rd-input-label">${playerName(pid)}${strokeBadge(strokesOnHoleFor(data, pid, currentHole))}</div>
-            ${stepperHtml(matchId, sideKey, i, value(sideKey, i), par, playerName(pid), currentHole)}
+            <div class="rd-player${active === `${sideKey}:${i}` ? " is-active" : ""}" data-match-id="${matchId}" data-side="${sideKey}" data-player-index="${i}">
+              <div class="rd-input-label">${playerName(pid)}${strokeBadge(strokesOnHoleFor(data, pid, currentHole))}</div>
+              ${stepperHtml(matchId, sideKey, i, value(sideKey, i), par, playerName(pid), currentHole, { withQuickPicks: false })}
+            </div>
           `
         )
         .join("")}
     </div>
   `;
-  return `<div class="rd-inputs">${group("a", "USA", sideA)}${group("b", "EU", sideB)}</div>`;
+  return `<div class="rd-inputs">${group("a", "USA", sideA)}${group("b", "EU", sideB)}</div>
+          <div class="rd-quick-single">${singleQuickHtml(matchId, active, value, par, sideA, sideB)}</div>`;
+}
+
+// Best ball: the players in the order the grid walks through them.
+function playerKeys(sideA, sideB) {
+  return [...sideA.map((_, i) => `a:${i}`), ...sideB.map((_, i) => `b:${i}`)];
+}
+
+// Which player the single grid is for: the one tapped/moved to, or by
+// default the first player whose box is still empty (else the first).
+function activePlayerFor(matchId, data, currentHole, sideA, sideB) {
+  const keys = playerKeys(sideA, sideB);
+  if (keys.includes(activePlayerByMatch[matchId])) return activePlayerByMatch[matchId];
+  const firstEmpty = keys.find((key) => {
+    const [side, i] = key.split(":");
+    return holeInputValue(data, matchId, currentHole, side, Number(i)) === "";
+  });
+  return firstEmpty || keys[0];
+}
+
+// The single grid's HTML: "Adams:" and that player's 2 x 2 quick picks.
+function singleQuickHtml(matchId, activeKey, value, par, sideA, sideB) {
+  if (!activeKey) return "";
+  const [side, i] = activeKey.split(":");
+  const pid = (side === "a" ? sideA : sideB)[Number(i)];
+  const target = `data-match-id="${matchId}" data-side="${side}" data-player-index="${i}"`;
+  return `<div class="rd-quick-for">${playerName(pid)}:</div>${quickPickHtml(target, value(side, Number(i)), par, playerName(pid))}`;
 }
 
 // Read-only version for cards this browser can't score: the current
@@ -390,7 +452,9 @@ function warningsHtml(matchId) {
   return warningsForMatch(roundId, matchId)
     .map((w) => {
       let text;
-      if (w.type === "refused") {
+      if (w.type === "cleared") {
+        text = `Hole ${w.hole} was cleared by the organizer (this phone had entered ${formatHoleScore(w.entered)}).`;
+      } else if (w.type === "refused") {
         text = `Hole ${w.hole} (${formatHoleScore(w.entered)}) didn't save: the server refused it${w.reason ? ` (${w.reason})` : ""}. Check you picked your own name, then enter it again.`;
       } else if (w.now.a == null && w.now.b == null) {
         text = `Hole ${w.hole} has no score on the server, but this phone entered ${formatHoleScore(w.entered)}. Please enter it again.`;
@@ -448,6 +512,62 @@ function holeSyncStatus(matchId, hole) {
   return note.status === "pending" ? { text: "Saved on phone", cls: "" } : { text: "Sent ✓", cls: " ok" };
 }
 
+// Does a side's saved value contain any number? (A number, or for
+// best ball an array with at least one number.)
+function sideHasNumber(value) {
+  return Array.isArray(value) ? value.some((v) => v != null) : value != null;
+}
+
+// "Smith/Adams" from a side's player ids (last names only, to fit).
+function lastNames(ids) {
+  return ids.map((id) => playerName(id).split(" ").slice(-1)[0]).join("/") || "TBD";
+}
+
+// Item 1: a match folded into one tappable row: match number, names,
+// status, plus a small ⚠ / ⏳ if that match has a warning or scores
+// waiting to send from this phone (so nothing important hides inside a
+// closed card).
+function collapsedCardHtml(matchId, mine, sideA, sideB, scored) {
+  const label = matchId.replace("match", "Match ");
+  const warnCount = warningsForMatch(roundId, matchId).length;
+  const waiting =
+    pendingByMatch[matchId] || entriesForMatch(roundId, matchId).some((note) => note.status === "pending");
+  const flags =
+    (warnCount ? `<span class="rd-row-flag is-warn" aria-label="${warnCount} warning${warnCount === 1 ? "" : "s"}">⚠ ${warnCount}</span>` : "") +
+    (waiting ? `<span class="rd-row-flag" aria-label="scores waiting to send">⏳</span>` : "");
+  return `
+    <article class="sb-card rd-card rd-card-collapsed${mine ? " is-mine" : ""}" id="card-${matchId}" data-match-id="${matchId}">
+      <button type="button" class="rd-expand" data-match-id="${matchId}" aria-expanded="false" aria-label="Open ${label}">
+        <span class="rd-row-no">${label}${mine ? ' <span class="rd-mine-tag">Your match</span>' : ""}</span>
+        <span class="rd-row-names">${lastNames(sideA)} v ${lastNames(sideB)}</span>
+        <span class="rd-row-end">${flags}${statusPill(scored.overall)}<span class="rd-row-chev" aria-hidden="true">▾</span></span>
+      </button>
+    </article>
+  `;
+}
+
+// Item 7: make a best-ball player the active one WITHOUT redrawing the
+// card (a redraw would close the phone keyboard if they're typing):
+// move the highlight and rebuild just the single quick-pick grid.
+function setActivePlayer(card, key) {
+  const matchId = card.dataset.matchId;
+  activePlayerByMatch[matchId] = key;
+  const [side, i] = key.split(":");
+  card.querySelectorAll(".rd-player").forEach((el) => {
+    el.classList.toggle("is-active", el.dataset.side === side && el.dataset.playerIndex === i);
+  });
+  const holder = card.querySelector(".rd-quick-single");
+  if (!holder) return;
+  const data = matchesById[matchId] || {};
+  const par = course.holes[currentHoleByMatch[matchId] - 1].par;
+  // The boxes on screen are the truth for what's typed so far.
+  const valueOnScreen = (s, idx) => {
+    const input = card.querySelector(`.hole-score-input[data-side="${s}"][data-player-index="${idx}"]`);
+    return input ? input.value : "";
+  };
+  holder.innerHTML = singleQuickHtml(matchId, key, valueOnScreen, par, data.sideA || [], data.sideB || []);
+}
+
 // ---------------------------------------------------------------
 // Match cards
 // ---------------------------------------------------------------
@@ -458,16 +578,19 @@ function renderMatchCard(matchId, mine) {
   const sideB = data.sideB || [];
   const label = matchId.replace("match", "Match ");
 
+  // No pairing yet: one slim line, the same height as a collapsed
+  // match row (pain points: you chose to match them).
   if (sideA.length === 0 && sideB.length === 0) {
     return `
-      <article class="sb-card rd-card rd-card-empty" id="card-${matchId}" data-match-id="${matchId}">
-        <h3 class="sb-match-no">${label}</h3>
-        <p class="rd-empty-note">Pairings not set yet.</p>
+      <article class="sb-card rd-card rd-card-empty rd-card-slim" id="card-${matchId}" data-match-id="${matchId}">
+        <span class="rd-row-no">${label}</span>
+        <span class="rd-empty-note">Pairings not set yet.</span>
       </article>
     `;
   }
 
   const scored = scoreMatch(data);
+  if (!isOpen(matchId, mine)) return collapsedCardHtml(matchId, mine, sideA, sideB, scored);
   const currentHole = currentHoleFor(matchId, data);
   const holeInfo = course.holes[currentHole - 1];
   const holeTip = HOLE_TIPS[roundId][currentHole - 1];
@@ -484,6 +607,20 @@ function renderMatchCard(matchId, mine) {
 
   const holeSync = holeSyncStatus(matchId, currentHole);
 
+  // Item 2: admin-only "Clear hole", shown only when the hole on screen
+  // has a saved score. Armed (red, "Tap again…") after the first tap.
+  const savedHole = (data.holes || {})[String(currentHole)];
+  const hasSaved = Boolean(savedHole) && (sideHasNumber(savedHole.a) || sideHasNumber(savedHole.b));
+  const armed = armedClear && armedClear.matchId === matchId && armedClear.hole === currentHole && armedClear.until > Date.now();
+  const clearHtml =
+    isAdminUnlocked && hasSaved
+      ? `<button type="button" class="rd-clear-hole${armed ? " is-armed" : ""}" data-match-id="${matchId}">${
+          armed ? `Tap again to clear hole ${currentHole} (${formatHoleScore(savedHole)})` : `Clear hole ${currentHole} (admin)`
+        }</button>`
+      : "";
+  const clearErrorHtml =
+    clearError && clearError.matchId === matchId ? `<p class="status-msg error rd-clear-error">${clearError.text}</p>` : "";
+
   const entry = canEdit
     ? `
       ${renderHoleInputs(matchId, data, currentHole, sideA, sideB)}
@@ -495,6 +632,8 @@ function renderMatchCard(matchId, mine) {
         <span class="rd-unsaved"${hasDraft ? "" : " hidden"}>Not saved yet</span>
         <span class="status-msg${holeSync.cls}" data-save-status="${matchId}-hole">${holeSync.text}</span>
       </div>
+      ${clearHtml}
+      ${clearErrorHtml}
     `
     : renderHoleReadOnly(matchId, data, currentHole, sideA, sideB) + lockedNote;
 
@@ -502,7 +641,11 @@ function renderMatchCard(matchId, mine) {
     <article class="sb-card rd-card${mine ? " is-mine" : ""}" id="card-${matchId}" data-match-id="${matchId}">
       <div class="sb-card-top">
         <h3 class="sb-match-no">${label}${mine ? ' <span class="rd-mine-tag">Your match</span>' : ""}</h3>
-        ${statusPill(scored.overall)}
+        <span class="rd-top-right">
+          ${statusPill(scored.overall)}
+          <!-- Item 1: fold this card back into a one-line row. -->
+          <button type="button" class="rd-collapse" data-match-id="${matchId}" aria-expanded="true" aria-label="Collapse ${label}">▴</button>
+        </span>
       </div>
       ${sidesHtml(people(sideA), people(sideB), scored.points)}
       ${segmentChipsHtml(scored)}
@@ -568,7 +711,7 @@ function renderRoundTotal() {
 // (which kind of control, for which match/side/player/hole), so that
 // after a redraw the same control can be found and focused again.
 // Keeps keyboard and screen-reader users in place.
-const FOCUS_CLASSES = ["hole-score-input", "rd-step", "rd-quick-btn", "rd-both-par", "prev-hole", "next-hole", "rd-hole-btn", "save-hole"];
+const FOCUS_CLASSES = ["hole-score-input", "rd-step", "rd-quick-btn", "rd-both-par", "rd-expand", "rd-collapse", "rd-clear-hole", "prev-hole", "next-hole", "rd-hole-btn", "save-hole"];
 function focusSelector(el) {
   if (!el || !el.closest || !el.closest("#matches")) return null;
   const cls = FOCUS_CLASSES.find((c) => el.classList.contains(c));
@@ -608,6 +751,7 @@ function renderMatches() {
 
 function goToHole(matchId, hole) {
   currentHoleByMatch[matchId] = Math.min(18, Math.max(1, hole));
+  delete activePlayerByMatch[matchId];   // new hole: grid starts at the first empty box
   renderMatches();
 }
 
@@ -642,6 +786,64 @@ matchesEl.addEventListener("click", async (event) => {
   if (!card) return;
   const matchId = card.dataset.matchId;
 
+  // Item 1: open / close a match card.
+  if (target.classList.contains("rd-expand")) {
+    openOverride[matchId] = true;
+    renderMatches();
+    document.querySelector(`#card-${matchId} .rd-collapse`)?.focus();
+    return;
+  }
+  if (target.classList.contains("rd-collapse")) {
+    openOverride[matchId] = false;
+    renderMatches();
+    document.querySelector(`#card-${matchId} .rd-expand`)?.focus();
+    return;
+  }
+
+  // Item 2: admin "Clear hole", two taps.
+  if (target.classList.contains("rd-clear-hole")) {
+    const hole = currentHoleByMatch[matchId];
+    const armedHere = armedClear && armedClear.matchId === matchId && armedClear.hole === hole && armedClear.until > Date.now();
+    clearError = null;
+    if (!armedHere) {
+      // First tap: arm, and disarm again after 5 s if not confirmed.
+      armedClear = { matchId, hole, until: Date.now() + CLEAR_CONFIRM_MS };
+      setTimeout(() => {
+        if (armedClear && armedClear.until <= Date.now() + 50) {
+          armedClear = null;
+          renderMatches();
+        }
+      }, CLEAR_CONFIRM_MS);
+      return renderMatches();
+    }
+    // Second tap: replace the hole with one that has NO scores, only
+    // the tap time (t) and this browser's id (u), the same two extras
+    // Save writes. Scoring only reads a hole's a/b, so the hole counts
+    // as not played; keeping t and u lets the score-change log record
+    // who cleared it and when (deleting the hole outright would lose
+    // them). Like Save, this doesn't wait for the server (works offline).
+    armedClear = null;
+    forgetEntry(roundId, matchId, hole);           // this phone's own note about it
+    delete drafts[draftKey(matchId, hole)];
+    let write;
+    try {
+      const stub = { t: Date.now() };
+      if (auth.currentUser) stub.u = auth.currentUser.uid;
+      write = updateDoc(matchRef(matchId), { [`holes.${hole}`]: stub });
+    } catch (err) {
+      write = Promise.reject(err);
+    }
+    write.catch((err) => {
+      console.error(`Clearing hole ${hole} of ${matchId} failed`, err);
+      clearError = {
+        matchId,
+        text: `Couldn't clear hole ${hole}${err && err.code === "permission-denied" ? ": the admin code isn't active on this phone" : ""}.`,
+      };
+      renderMatches();
+    });
+    return renderMatches();
+  }
+
   // OK on a "hole was changed / didn't save" warning: forget it.
   if (target.classList.contains("rd-sync-ok")) {
     dismissWarning(target.dataset.warningKey);
@@ -660,6 +862,16 @@ matchesEl.addEventListener("click", async (event) => {
     );
     input.value = target.dataset.value;
     updateDraft(card);
+    // Best ball (item 7): move the single grid on to the next player.
+    if (isBestBall) {
+      const data = matchesById[matchId] || {};
+      const keys = playerKeys(data.sideA || [], data.sideB || []);
+      const current = `${target.dataset.side}:${index}`;
+      const next = keys[keys.indexOf(current) + 1];
+      setActivePlayer(card, next || current);
+      // Keep keyboard focus on the grid (it was just rebuilt).
+      card.querySelector(".rd-quick-single .rd-quick-btn")?.focus();
+    }
     return;
   }
 
@@ -677,6 +889,8 @@ matchesEl.addEventListener("click", async (event) => {
   // on the first tap. Kept between 1 and 15 (the box's min/max).
   if (target.classList.contains("rd-step")) {
     const index = target.dataset.playerIndex;
+    // Best ball: using a player's − / + makes them the active player.
+    if (isBestBall && index != null) setActivePlayer(card, `${target.dataset.side}:${index}`);
     const input = card.querySelector(
       `.hole-score-input[data-side="${target.dataset.side}"]${index == null ? "" : `[data-player-index="${index}"]`}`
     );
@@ -758,9 +972,27 @@ matchesEl.addEventListener("click", async (event) => {
     // hole rather than making you click "Next" every time.
     if (sideComplete(aValue) && sideComplete(bValue) && hole < 18) {
       currentHoleByMatch[matchId] = hole + 1;
+      delete activePlayerByMatch[matchId];
     }
     renderMatches();
   }
+});
+
+// Best ball (item 7): tapping a player's name or box makes them the
+// active player for the single quick-pick grid. "focusin" fires when
+// the box gets focus (tap, or Tab from a keyboard).
+function selectPlayerFrom(event) {
+  if (!isBestBall) return;
+  const player = event.target.closest(".rd-player");
+  if (!player) return;
+  const card = player.closest(".rd-card");
+  const key = `${player.dataset.side}:${player.dataset.playerIndex}`;
+  if (activePlayerByMatch[card.dataset.matchId] !== key || !player.classList.contains("is-active")) setActivePlayer(card, key);
+}
+matchesEl.addEventListener("focusin", selectPlayerFrom);
+matchesEl.addEventListener("click", (event) => {
+  if (event.target.closest("button")) return;   // buttons are handled above
+  selectPlayerFrom(event);
 });
 
 // Typing in a box directly also counts as an unsaved draft.
@@ -771,7 +1003,14 @@ matchesEl.addEventListener("input", (event) => {
 
 // Tapping the pinned "Your match" bar scrolls to your card.
 document.getElementById("rd-mybar").addEventListener("click", (event) => {
-  const card = document.getElementById(event.currentTarget.dataset.target);
+  // Item 1: if you'd folded your own match away, open it first.
+  const targetId = event.currentTarget.dataset.target;   // "card-match3"
+  const myId = targetId.replace("card-", "");
+  if (openOverride[myId] === false) {
+    openOverride[myId] = true;
+    renderMatches();
+  }
+  const card = document.getElementById(targetId);
   const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   card?.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "start" });
 });
