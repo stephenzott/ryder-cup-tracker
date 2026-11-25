@@ -7,7 +7,10 @@ that could bother 16 players on a walking-only, 36-hole Friday.
 - **Built:** items 1, 2 and 7 (see "What was built" at the bottom).
 - **Covered in person:** items 3, 4, 8 and 9 go in your talk the day before
   the tournament.
-- **Not built:** items 5 and 6.
+- **Skipped (your decision):** item 5. If you're offline, you're offline.
+- **Moved to `CLAUDE_CODE_PROMPTS_2028.md`:** item 6, under Prompt 1 (the
+  inventory) and Prompt 4 #5 (worked out from settings), along with the
+  typed-in "4 rounds" in the same sentence.
 
 | # | Pain point | Why it matters | Possible fix | Effort |
 |---|---|---|---|---|

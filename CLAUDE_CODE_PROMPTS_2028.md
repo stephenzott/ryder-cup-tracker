@@ -82,6 +82,9 @@ Things I already know about (confirm these, then find the rest):
   alerts text
 - the match counts (4 / 4 / 4 / 8) and the "30½ to win" number: are
   they calculated, or typed in?
+- the Home intro sentence in public/js/index.js ("16 players, 4 rounds,
+  straight Nassau scoring…") types in "16 players" and "4 rounds"
+  (DAY_OF_PAIN_POINTS.md item 6, moved here)
 
 Give me a table: file, line, what it assumes, and which bucket it falls
 into:
@@ -205,7 +208,10 @@ Before building, explain and ask me about:
 4. Whether the match counts come from the roster size automatically or
    are set on Admin per round.
 5. Make sure the points total and the number needed to win ("30½") are
-   calculated from the match counts, not typed in.
+   calculated from the match counts, not typed in. Same for the Home intro
+   sentence in public/js/index.js: "16 players" should come from the
+   roster (or the group-size setting) and "4 rounds" from the round list
+   (DAY_OF_PAIN_POINTS.md item 6).
 
 After I approve, build it, test on the emulators at 360/390/430px, run the
 existing tests, and give me the deploy checklist (rules + hosting, and
